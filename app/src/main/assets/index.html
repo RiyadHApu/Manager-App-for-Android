@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light dark}body{margin:0}[hidden]{display:none!important}</style></head><body>
+<script src="fb.js"></script>
 <title>Deskbook Manager</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -117,6 +118,12 @@ label{display:block;font-size:13px;color:var(--mute);margin-bottom:4px;font-weig
   .ln .it,.ln .ds{grid-column:1/-1}
   .ln .amt{grid-column:span 2}
 }
+#gate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:16px;z-index:80;overflow:auto}
+#gate[hidden]{display:none}
+.gate-card{width:min(480px,100%)}
+.gate-card h3{margin:0 0 6px;font-size:20px;font-weight:600}
+.gate-card .f{grid-template-columns:1fr}
+#sync{white-space:nowrap}
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
 
@@ -129,6 +136,7 @@ label{display:block;font-size:13px;color:var(--mute);margin-bottom:4px;font-weig
 </div>
 <div id="modal" hidden></div>
 <div id="toast" role="status"></div>
+<div id="gate" hidden></div>
 
 <script>
 (function(){
@@ -148,7 +156,7 @@ const fdate=s=>{if(!s)return '';const [y,m,d]=s.split('-');return `${+d} ${MON[+
 function blank(){return {v:1,sample:false,
   settings:{company:'My Company',cur:'৳',tax:0,pS:'INV-',pP:'BILL-'},
   accounts:[{id:'cash',name:'Cash in hand',open:0},{id:'bank',name:'Bank account',open:0}],
-  seq:{sales:0,purchases:0},parties:[],items:[],sales:[],purchases:[],payments:[]}}
+  seq:{sales:0,purchases:0},parties:[],items:[],sales:[],purchases:[],payments:[],adjustments:[]}}
 function sample(){
   const d=blank();d.sample=true;d.settings.company='Sample Trading Co.';d.settings.tax=5;
   d.accounts[0].open=25000;d.accounts[1].open=400000;
@@ -182,8 +190,9 @@ function sample(){
   return d}
 let db=null,warnedStore=false;
 function load(){try{const r=localStorage.getItem(KEY);if(r){const o=JSON.parse(r);if(o&&o.v===1)return o}}catch(e){}return null}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){if(!warnedStore){warnedStore=true;toast('Could not save in this browser. Copy a backup from Settings.')}}}
-db=load()||sample();
+const CLOUD=!!window.FB;
+function save(){if(CLOUD){pushDiff();return}try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){if(!warnedStore){warnedStore=true;toast('Could not save in this browser. Copy a backup from Settings.')}}}
+db=CLOUD?blank():(load()||sample());
 
 /* ---------- calculations ---------- */
 const money=n=>{n=+n||0;const s=Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});return (n<-0.004?'-':'')+db.settings.cur+' '+s};
@@ -202,7 +211,8 @@ const acct=id=>db.accounts.find(a=>a.id===id);
 function itemStats(it){let pq=0,pv=0,sq=0;
   db.purchases.forEach(d=>d.lines.forEach(l=>{if(l.itemId===it.id){pq+=num(l.qty);pv+=lineNet(l)}}));
   db.sales.forEach(d=>d.lines.forEach(l=>{if(l.itemId===it.id)sq+=num(l.qty)}));
-  const oq=num(it.opening),base=oq+pq,avg=base>0?(oq*num(it.cost)+pv)/base:num(it.cost),q=base-sq;
+  let aq=0;(db.adjustments||[]).forEach(a=>{if(a.itemId===it.id)aq+=num(a.qty)});
+  const oq=num(it.opening),base=oq+pq,avg=base>0?(oq*num(it.cost)+pv)/base:num(it.cost),q=base-sq+aq;
   return {qty:q,avg:avg,value:Math.max(q,0)*avg,sold:sq}}
 function partyBal(p){const list=p.type==='c'?db.sales:db.purchases;return list.filter(d=>d.partyId===p.id).reduce((a,d)=>a+balOf(d),0)}
 function acctBal(a){let b=num(a.open);db.payments.forEach(p=>{if(p.accountId!==a.id)return;b+=p.kind==='in'?p.amount:-p.amount});return b}
@@ -250,7 +260,9 @@ function openForm(cfg){
   modal.querySelector('.sheet').addEventListener('click',e=>{
     const x=e.target.closest('[data-x]');if(!x)return;
     if(x.dataset.x==='close')closeModal();
-    if(x.dataset.x==='save'){const r=cfg.onSave(s);if(r===true){closeModal();render()}else $('#ferr').textContent=r||''}
+    if(x.dataset.x==='save'){if(x.disabled)return;x.disabled=true;
+      Promise.resolve().then(()=>cfg.onSave(s)).then(r=>{x.disabled=false;if(r===true){closeModal();render()}else{const e=$('#ferr');if(e)e.textContent=r||''}},
+        err=>{x.disabled=false;const e=$('#ferr');if(e)e.textContent='Could not save: '+((err&&err.message)||err)})}
     if(x.dataset.x==='del'){if(x.dataset.sure){cfg.del(s);closeModal();render()}else{x.dataset.sure='1';x.textContent='Tap again to delete';setTimeout(()=>{x.dataset.sure='';x.textContent='Delete'},3000)}}});
   setTimeout(()=>{const f=bd.querySelector('input:not([type=hidden]),select');f&&f.focus&&f.focus({preventScroll:true})},30)}
 
@@ -283,13 +295,14 @@ function topActs(){
     case 'money':return b('newPay','Receive','data-k="in"',1)+b('newPay','Pay supplier','data-k="out"')+b('newPay','Expense','data-k="exp"');
     case 'customers':return b('newParty','Add customer','data-t="c"',1);
     case 'suppliers':return b('newParty','Add supplier','data-t="s"',1);
-    case 'items':return b('newItem','Add item','',1);
+    case 'items':return b('newItem','Add item','',1)+b('newAdj','Adjust stock');
   }return ''}
 
 function render(){
   $('#co').textContent=db.settings.company;
   document.querySelectorAll('#rail button').forEach(b=>b.setAttribute('aria-current',b.dataset.v===S.view?'page':'false'));
-  $('#top').innerHTML=`<h1>${TITLES[S.view]}</h1><div class="acts">${topActs()}</div>`;
+  $('#top').innerHTML=`<h1>${TITLES[S.view]}</h1>${CLOUD?'<span id="sync" class="pill"></span>':''}<div class="acts">${topActs()}</div>`;
+  if(CLOUD)paintSync();
   $('#view').innerHTML=VIEWS[S.view]();
   const l=$('#list');if(l&&LISTS[S.view])l.innerHTML=LISTS[S.view]();
   save()}
@@ -366,11 +379,15 @@ VIEWS.suppliers=()=>sampleBanner()+tools('Search suppliers');
 LISTS.customers=()=>partyList('c');LISTS.suppliers=()=>partyList('s');
 
 VIEWS.items=()=>sampleBanner()+tools('Search items or SKU');
-LISTS.items=()=>{
+const itemsBase=()=>{
   const list=db.items.filter(i=>match(S.q,i.name,i.sku)).sort((a,b)=>a.name.localeCompare(b.name));
   return table([['Item'],['SKU'],['In stock','r'],['Avg cost','r'],['Sell price','r'],['Stock value','r']],
     list.map(i=>{const s=itemStats(i),low=s.qty<=num(i.reorder);return `<tr data-act="editItem" data-id="${i.id}" tabindex="0"><td>${esc(i.name)}${low?' <span class="pill overdue">Low</span>':''}</td><td class="num">${esc(i.sku)}</td><td class="r num ${s.qty<0?'neg':''}">${qty(s.qty)} ${esc(i.unit)}</td><td class="r num">${money(s.avg)}</td><td class="r num">${money(i.price)}</td><td class="r num">${money(s.value)}</td></tr>`}),
     'No items yet. Add the products you buy and sell.')};
+const adjTable=()=>{const a=(db.adjustments||[]).slice().sort((x,y)=>x.date<y.date?1:-1).slice(0,20);if(!a.length)return '';
+  const it=id=>(db.items.find(i=>i.id===id)||{name:'(deleted)'}).name;
+  return `<h2 style="margin:20px 0 8px">Recent stock adjustments</h2>`+table([['Date'],['Item'],['Change','r'],['Reason']],a.map(x=>`<tr data-act="editAdj" data-id="${x.id}" tabindex="0"><td>${fdate(x.date)}</td><td>${esc(it(x.itemId))}</td><td class="r num ${x.qty<0?'neg':'pos'}">${x.qty>0?'+':''}${qty(x.qty)}</td><td>${esc(x.reason)}</td></tr>`),'')};
+LISTS.items=()=>itemsBase()+adjTable();
 
 /* ---------- reports ---------- */
 function profitLoss(r){
@@ -431,13 +448,17 @@ VIEWS.settings=function(){const st=db.settings;
     <p><button class="btn" data-act="editAcct" data-id="">Add account</button></p></div>
   </div>
   <div class="card" style="margin-bottom:14px"><h2>Backup and restore</h2>
-    <p class="mute" style="margin-top:0">Your records are stored in this browser on this tablet only. Copy a backup now and then and keep it somewhere safe, such as a note or an email to yourself. Paste it back here to restore.</p>
+    <p class="mute" style="margin-top:0">${CLOUD?'Your records live in the company cloud and every signed-in phone and tablet shows the same data. A backup is still a good idea. Restoring replaces the data on all devices.':'Your records are stored in this browser on this tablet only. Copy a backup now and then and keep it somewhere safe, such as a note or an email to yourself. Paste it back here to restore.'}</p>
     <div class="tools"><button class="btn" data-act="copyBackup">Copy backup</button></div>
     <label for="restore">Paste a backup here to restore</label><textarea id="restore" placeholder="{ ... }"></textarea>
     <p><button class="btn" data-act="restore">Restore from backup</button></p></div>
-  <div class="card"><h2>Start over</h2>
+  ${CLOUD?`<div class="card"><h2>Account and sync</h2>
+    <p style="margin-top:0">Signed in as <b>${esc(cloud.user&&cloud.user.email||'')}</b></p>
+    <p class="mute">Changes made on any device appear on the others within a few seconds. Without internet the app keeps working and sends the changes when the connection returns.</p>
+    <button class="btn" data-act="signOut">Sign out</button> <button class="btn" data-act="changeProject">Use a different cloud project</button></div>`
+  :`<div class="card"><h2>Start over</h2>
     <p class="mute" style="margin-top:0">Removes every record and returns to an empty company. Copy a backup first.</p>
-    <button class="btn danger" data-act="wipe">Erase all data</button> <button class="btn" data-act="loadSample">Load sample data</button></div>`};
+    <button class="btn danger" data-act="wipe">Erase all data</button> <button class="btn" data-act="loadSample">Load sample data</button></div>`}`};
 
 /* ---------- forms ---------- */
 function partyForm(id,type){
@@ -464,9 +485,21 @@ function acctForm(id){
     del:ex?()=>{if(db.payments.some(p=>p.accountId===id)){toast('Has payments. Cannot delete.');return}db.accounts=db.accounts.filter(a=>a.id!==id);toast('Deleted')}:null,
     onSave:s=>{if(!s.name.trim())return 'Enter a name.';if(ex){ex.name=s.name.trim();ex.open=num(s.open)}else db.accounts.push({id:uid(),name:s.name.trim(),open:num(s.open)});return true}})}
 
+function adjForm(id){
+  const ex=id&&(db.adjustments||[]).find(a=>a.id===id);const s=ex?{...ex}:{itemId:'',date:today(),qty:'',reason:'Stock count'};
+  openForm({title:ex?'Edit stock adjustment':'Adjust stock',s:s,narrow:true,
+    body:s=>`<div class="f">${fld('Item',`<select data-f="itemId">${opts(db.items.map(i=>[i.id,i.name]),s.itemId,'Choose…')}</select>`)}${fld('Date',inp('date',s.date,'date'))}</div>
+    <div class="f">${fld('Quantity change (use - to reduce)',inp('qty',s.qty,'number','step="any" inputmode="decimal"'))}${fld('Reason',`<input data-f="reason" list="reasons" value="${esc(s.reason)}"><datalist id="reasons"><option value="Stock count"><option value="Damaged"><option value="Expired"><option value="Lost"><option value="Sample given"><option value="Returned"></datalist>`)}</div>
+    <p class="mute" style="font-size:13px">Adding stock that you bought? Record a purchase bill instead, so the cost and supplier balance stay correct.</p>`,
+    del:ex?()=>{db.adjustments=db.adjustments.filter(a=>a.id!==id);toast('Deleted')}:null,
+    onSave:s=>{if(!s.itemId)return 'Choose an item.';const q=num(s.qty);if(!q)return 'Enter a quantity other than zero.';
+      const o={itemId:s.itemId,date:s.date||today(),qty:q,reason:(s.reason||'').trim()};
+      if(!db.adjustments)db.adjustments=[];if(ex)Object.assign(ex,o);else db.adjustments.push({id:uid(),...o});return true}})}
+
 function docForm(type,id,pre){
   const isS=type==='sales',ex=id&&db[type].find(d=>d.id===id);
   const s=ex?JSON.parse(JSON.stringify(ex)):{no:nextNo(type),date:today(),due:addDays(today(),30),partyId:(pre&&pre.partyId)||'',lines:[{itemId:'',desc:'',qty:1,price:'',disc:''}],tax:db.settings.tax,note:''};
+  if(!ex)s.autoNo=s.no;
   const plist=db.parties.filter(p=>p.type===(isS?'c':'s')).sort((a,b)=>a.name.localeCompare(b.name)).map(p=>[p.id,p.name]);
   const itemOpts=sel=>opts(db.items.map(i=>[i.id,i.name]),sel,'Custom line');
   const lineRow=(l,i)=>{const it=db.items.find(x=>x.id===l.itemId);const st=it&&isS?itemStats(it).qty:null;
@@ -490,11 +523,12 @@ function docForm(type,id,pre){
     onChange:(s,f,i)=>{if(f==='itemId'){const l=s.lines[i],it=db.items.find(x=>x.id===l.itemId);if(it){l.desc=it.name;l.price=isS?it.price:it.cost}}},
     live:(s,bd)=>{s.lines.forEach((l,i)=>{const e=bd.querySelector('#la'+i);if(e)e.textContent=money(lineNet(l))});const sm=bd.querySelector('#sum');if(sm)sm.innerHTML=totals(s)},
     del:ex?()=>{db[type]=db[type].filter(d=>d.id!==id);db.payments.forEach(p=>{if(p.docId===id)p.docId=''});toast('Deleted. Linked payments were kept.')}:null,
-    onSave:s=>{
+    onSave:async s=>{
       if(!s.partyId)return isS?'Choose a customer.':'Choose a supplier.';
       const lines=s.lines.filter(l=>num(l.qty)>0&&(l.itemId||l.desc.trim()||num(l.price)>0));
       if(!lines.length)return 'Add at least one line with a quantity.';
       if(!s.no.trim())return 'Enter an invoice number.';
+      if(!ex&&CLOUD&&s.no===s.autoNo)s.no=await allocNo(type);
       if(db[type].some(d=>d.no===s.no.trim()&&d.id!==id))return 'That number is already used.';
       const o={no:s.no.trim(),date:s.date||today(),due:s.due||s.date,partyId:s.partyId,tax:num(s.tax),note:s.note,lines:lines.map(l=>({itemId:l.itemId,desc:l.desc.trim(),qty:num(l.qty),price:num(l.price),disc:num(l.disc)}))};
       if(ex)Object.assign(ex,o);else{db[type].push({id:uid(),...o});const m=s.no.match(/(\d+)$/);db.seq[type]=Math.max(db.seq[type],m?+m[1]:db.seq[type]+1)}
@@ -536,6 +570,7 @@ function openDoc(type,id){
   ${d.lines.map(l=>`<tr><td>${esc(l.desc||'Item')}</td><td class="r num">${qty(l.qty)}</td><td class="r num">${money(l.price)}</td><td class="r num">${num(l.disc)?l.disc+'%':''}</td><td class="r num">${money(lineNet(l))}</td></tr>`).join('')}</tbody></table></div>
   <div class="sum"><div><span>Subtotal</span><span class="num">${money(subOf(d))}</span></div><div><span>Tax ${num(d.tax)}%</span><span class="num">${money(taxOf(d))}</span></div><div class="g"><span>Total</span><span class="num">${money(totOf(d))}</span></div><div><span>${isS?'Received':'Paid'}</span><span class="num">${money(paidOf(id))}</span></div><div class="g"><span>Balance</span><span class="num">${money(balOf(d))}</span></div></div>
   ${d.note?`<p class="mute">${esc(d.note)}</p>`:''}
+  ${d._by?`<p class="mute" style="font-size:12px">Last saved by ${esc(d._by)}, ${esc(new Date(d._ts).toLocaleString())}</p>`:''}
   ${pays.length?`<h2 style="margin-top:18px">Payments</h2><div class="tw"><table style="min-width:0">${pays.map(p=>`<tr data-act="editPay" data-id="${p.id}" tabindex="0"><td>${fdate(p.date)}</td><td>${esc((acct(p.accountId)||{}).name||'')}</td><td class="r num">${money(p.amount)}</td></tr>`).join('')}</table></div>`:''}</div>`;
   const btns=[{label:'Copy as text',run:()=>copy(docText(type,d),'Invoice text copied')},{label:'Edit',run:()=>{closeModal();docForm(type,id)}}];
   if(balOf(d)>0.005)btns.push({label:isS?'Record payment':'Pay bill',cls:'pri',run:()=>{closeModal();payForm(null,{docId:id})}});
@@ -557,13 +592,18 @@ const ACT={
   openDoc:d=>openDoc(d.a,d.id),
   newPay:d=>payForm(null,{kind:d.k}),editPay:d=>{closeModal();payForm(d.id)},
   newParty:d=>partyForm(null,d.t),openParty:d=>openParty(d.id),
-  newItem:()=>itemForm(),editItem:d=>itemForm(d.id),
+  newItem:()=>itemForm(),editItem:d=>itemForm(d.id),newAdj:()=>adjForm(),editAdj:d=>{closeModal();adjForm(d.id)},
+  signOut:()=>{FB.signOut(cloud.h)},
+  changeProject:()=>{try{localStorage.removeItem(FBCFG)}catch(e){}try{FB.signOut(cloud.h)}catch(e){}location.reload()},
   editAcct:d=>acctForm(d.id||null),
   clearSample:()=>{const keep=db.settings;db=blank();db.settings.cur=keep.cur;render();toast('Sample data cleared')},
   loadSample:()=>{db=sample();render();toast('Sample data loaded')},
   saveSettings:()=>{const st=db.settings;st.company=$('#s_co').value.trim()||'My Company';st.cur=$('#s_cur').value;st.tax=num($('#s_tax').value);st.pS=$('#s_pS').value;st.pP=$('#s_pP').value;render();toast('Settings saved')},
   copyBackup:()=>copy(JSON.stringify(db),'Backup copied. Paste it somewhere safe.'),
-  restore:()=>{const v=$('#restore').value.trim();if(!v)return toast('Paste a backup first');try{const o=JSON.parse(v);if(!o||o.v!==1||!Array.isArray(o.sales))throw 0;db=o;render();toast('Backup restored')}catch(e){toast('That is not a valid backup')}},
+  restore:()=>{const v=$('#restore').value.trim();if(!v)return toast('Paste a backup first');let o;
+    try{o=JSON.parse(v);if(!o||o.v!==1||!Array.isArray(o.sales))throw 0}catch(e){return toast('That is not a valid backup')}
+    if(CLOUD){const b=document.querySelector('[data-act=restore]');if(!b.dataset.sure){b.dataset.sure='1';b.textContent='Tap again: this replaces data on ALL devices';setTimeout(()=>{b.dataset.sure='';b.textContent='Restore from backup'},4000);return}}
+    o.adjustments=o.adjustments||[];if(CLOUD){o.seq=db.seq}db=o;render();toast('Backup restored')},
   wipe:function(){const b=document.querySelector('[data-act=wipe]');if(!b.dataset.sure){b.dataset.sure='1';b.textContent='Tap again to erase everything';setTimeout(()=>{b.dataset.sure='';b.textContent='Erase all data'},3500);return}db=blank();render();toast('All data erased')}
 };
 document.addEventListener('click',e=>{const t=e.target.closest('[data-act]');if(!t||t.closest('#modal'))return;ACT[t.dataset.act]&&ACT[t.dataset.act](t.dataset)});
@@ -571,7 +611,89 @@ modal.addEventListener('click',e=>{const t=e.target.closest('tr[data-act]');if(t
 document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches&&e.target.matches('tr[data-act]')){e.preventDefault();e.target.click()}});
 document.addEventListener('input',e=>{if(e.target.id==='q'){S.q=e.target.value;const l=$('#list');if(l&&LISTS[S.view])l.innerHTML=LISTS[S.view]()}});
 
+/* ---------- cloud sync (Firebase) ---------- */
+const COLS=['parties','items','sales','purchases','payments','adjustments'];
+const CCOLS=COLS.concat(['meta']);
+const FBCFG='deskbook.fbcfg';
+const cloud={h:null,user:null,loaded:false,pend:{},err:'',unsubs:[],got:0};
+let synced={};
+function pushDiff(){
+  if(!cloud.h||!cloud.loaded)return;
+  const fail=e=>{cloud.err=(e&&e.code)||'error';paintSync();toast('Could not save: '+((e&&e.code)||(e&&e.message)||'error'))};
+  COLS.forEach(c=>{const seen=new Set();
+    (db[c]||[]).forEach(o=>{seen.add(o.id);const k=c+'/'+o.id;
+      if(synced[k]!==JSON.stringify(o)){o._by=cloud.user&&cloud.user.email||'';o._ts=Date.now();
+        const j=JSON.stringify(o);synced[k]=j;FB.set(cloud.h,c,o.id,JSON.parse(j)).catch(fail)}});
+    Object.keys(synced).filter(k=>k.startsWith(c+'/')).forEach(k=>{const id=k.slice(c.length+1);
+      if(!seen.has(id)){delete synced[k];FB.del(cloud.h,c,id).catch(fail)}})});
+  const m=JSON.stringify({settings:db.settings,accounts:db.accounts});
+  if(synced['meta/main']!==m){synced['meta/main']=m;FB.set(cloud.h,'meta','main',JSON.parse(m)).catch(fail)}}
+function applySnap(c,snap){
+  if(c==='meta'){snap.docs.forEach(d=>{
+    if(d.id==='main'){if(d.data.settings)Object.assign(db.settings,d.data.settings);if(d.data.accounts)db.accounts=d.data.accounts;
+      synced['meta/main']=JSON.stringify({settings:db.settings,accounts:db.accounts})}
+    if(d.id==='counters'){db.seq.sales=d.data.sales||0;db.seq.purchases=d.data.purchases||0}});return}
+  const by=new Map(db[c].map(o=>[o.id,o])),ids=new Set();
+  snap.docs.forEach(d=>{ids.add(d.id);let o=by.get(d.id);const data=Object.assign({},d.data,{id:d.id});
+    if(o){if(JSON.stringify(o)!==JSON.stringify(data)){Object.keys(o).forEach(k=>delete o[k]);Object.assign(o,data)}}
+    else{o=data;db[c].push(o)}
+    synced[c+'/'+d.id]=JSON.stringify(o)});
+  db[c]=db[c].filter(o=>ids.has(o.id)||!(c+'/'+o.id in synced));
+  Object.keys(synced).forEach(k=>{if(k.startsWith(c+'/')&&!ids.has(k.slice(c.length+1)))delete synced[k]})}
+function paintSync(){const e=$('#sync');if(!e)return;const off=!navigator.onLine,pend=Object.values(cloud.pend).some(Boolean);
+  e.className='pill '+(cloud.err?'overdue':off?'unpaid':pend?'part':'paid');
+  e.textContent=cloud.err?'Sync problem':off?'Offline':pend?'Syncing…':'Synced'}
+window.addEventListener('online',()=>{if(CLOUD)paintSync()});window.addEventListener('offline',()=>{if(CLOUD)paintSync()});
+let rt;function scheduleRender(){clearTimeout(rt);rt=setTimeout(()=>{if(!cloud.loaded)return;
+  const a=document.activeElement;
+  if(a&&a.matches&&a.matches('input,textarea,select')&&$('#view').contains(a)){const l=$('#list');if(l&&LISTS[S.view])l.innerHTML=LISTS[S.view]();paintSync();return}
+  render()},60)}
+function fmtNo(type,n){return (type==='sales'?db.settings.pS:db.settings.pP)+String(n).padStart(4,'0')}
+async function allocNo(type){
+  const p=type==='sales'?db.settings.pS:db.settings.pP;
+  const temp=()=>{toast('Offline: a temporary invoice number was used');return p+today().slice(2).replace(/-/g,'')+'-'+Math.random().toString(36).slice(2,5).toUpperCase()};
+  if(!navigator.onLine)return temp();
+  try{for(let i=0;i<8;i++){
+    const n=await Promise.race([FB.alloc(cloud.h,type),new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),6000))]);
+    const no=fmtNo(type,n);if(!db[type].some(d=>d.no===no))return no}}catch(e){}
+  return temp()}
+/* sign-in gate */
+function showGate(html){const g=$('#gate');g.hidden=false;g.innerHTML='<div class="card gate-card">'+html+'</div>'}
+function hideGate(){const g=$('#gate');g.hidden=true;g.innerHTML=''}
+function gateSetup(msg){showGate(`<h3>Connect to your company cloud</h3><p class="mute">Paste the Firebase web app settings (the <b>firebaseConfig</b> block). You do this once on each device.</p>
+  <textarea id="g_cfg" placeholder="const firebaseConfig = {&#10;  apiKey: &quot;...&quot;,&#10;  projectId: &quot;...&quot;&#10;};" style="min-height:150px"></textarea>
+  <div class="err" style="text-align:left;flex:none;margin:6px 0">${esc(msg||'')}</div><button class="btn pri" data-g="cfg">Connect</button>`)}
+function gateLogin(msg){showGate(`<h3>Sign in</h3><p class="mute">Use the email and password the company owner created for you.</p>
+  <div class="f"><div><label for="g_em">Email</label><input id="g_em" type="email" autocomplete="username" autocapitalize="off"></div>
+  <div><label for="g_pw">Password</label><input id="g_pw" type="password" autocomplete="current-password"></div></div>
+  <div class="err" style="text-align:left;flex:none;margin:6px 0">${esc(msg||'')}</div>
+  <button class="btn pri" data-g="login">Sign in</button> <button class="btn" data-g="proj">Use a different cloud project</button>`)}
+function parseCfg(t){const o={};String(t).replace(/["']?(\w+)["']?\s*:\s*["']([^"']+)["']/g,(m,k,v)=>{o[k]=v;return m});return o.apiKey&&o.projectId?o:null}
+function endListen(){cloud.unsubs.forEach(u=>{try{u()}catch(e){}});cloud.unsubs=[];cloud.loaded=false;cloud.got=0;cloud.pend={};synced={};db=blank()}
+function beginListen(){
+  endListen();showGate('<p class="mute">Loading company data…</p>');const first={};
+  CCOLS.forEach(c=>{cloud.unsubs.push(FB.listen(cloud.h,c,snap=>{
+    applySnap(c,snap);cloud.pend[c]=snap.pending;cloud.err='';
+    if(!first[c]){first[c]=1;cloud.got++;if(cloud.got===CCOLS.length){cloud.loaded=true;hideGate();render()}}
+    scheduleRender()},
+    err=>{if(err&&err.code==='permission-denied'){showGate('<h3>Access not allowed</h3><p class="mute">This account is not on the company access list. Ask the owner to add your email address in the Firestore rules.</p><button class="btn" data-g="out">Sign out</button>')}
+      else{cloud.err=(err&&err.code)||'error';paintSync()}}))})}
+function startCloud(){
+  let cfg=null;try{cfg=JSON.parse(localStorage.getItem(FBCFG)||'null')}catch(e){}
+  if(!cfg)return gateSetup();
+  try{cloud.h=FB.init(cfg)}catch(e){try{localStorage.removeItem(FBCFG)}catch(x){}return gateSetup('Those settings did not work: '+e.message)}
+  showGate('<p class="mute">Starting…</p>');
+  FB.onAuth(cloud.h,u=>{if(u){cloud.user=u;beginListen()}else{cloud.user=null;endListen();gateLogin()}})}
+document.addEventListener('click',e=>{const t=e.target.closest('[data-g]');if(!t)return;const g=t.dataset.g;
+  if(g==='cfg'){const c=parseCfg($('#g_cfg').value);if(!c)return gateSetup('Could not find apiKey and projectId in what you pasted.');
+    try{localStorage.setItem(FBCFG,JSON.stringify(c))}catch(x){}startCloud()}
+  if(g==='login'){const em=$('#g_em').value.trim(),pw=$('#g_pw').value;if(!em||!pw)return;t.disabled=true;
+    FB.signIn(cloud.h,em,pw).catch(err=>{const c=(err&&err.code)||'';gateLogin(/invalid|wrong|user-not-found/.test(c)?'Wrong email or password.':/network/.test(c)?'No internet connection.':'Could not sign in ('+(c||err.message)+').')})}
+  if(g==='proj'||g==='out'){if(g==='proj'){try{localStorage.removeItem(FBCFG)}catch(x){}location.reload()}else FB.signOut(cloud.h)}});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='g_pw'){const b=document.querySelector('[data-g=login]');b&&b.click()}});
+
 render();
+if(CLOUD)startCloud();
 })();
 </script>
 
