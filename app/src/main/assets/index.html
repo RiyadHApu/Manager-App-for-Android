@@ -1,26 +1,24 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light dark}body{margin:0}[hidden]{display:none!important}</style></head><body>
-<script src="fb.js"></script>
-<script src="xlsx.full.min.js"></script>
-<title>Manager by Riyad</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><script src="fb.js"></script><script src="xlsx.full.min.js"></script><style>:root{color-scheme:light dark}body{margin:0}[hidden]{display:none!important}</style></head><body>
+<title>Business Manager</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 /* Layout: dark navigation rail on the left (top tabs on phones), one working pane on the right, forms in a centred sheet. Built for tablet touch. */
 :root{
   --bg:#eef1f4;--surface:#ffffff;--ink:#16212c;--mute:#5b6b7a;--line:#d9e0e7;
-  --accent:#0d6e6a;--accent-ink:#ffffff;--accent-soft:#dff1ef;
+  --accent:#0d6e6a;--accent-ink:#ffffff;--accent-text:#0d6e6a;--accent-soft:#dff1ef;
   --good:#1b7a44;--warn:#a8610a;--bad:#b3261e;--rail:#14212d;--rail-ink:#cfd9e2;--rail-on:#ffffff;
   --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#0e151b;--surface:#16202a;--ink:#e6edf3;--mute:#92a3b3;--line:#263543;
-  --accent:#3ec4bb;--accent-ink:#05211f;--accent-soft:#12332f;
+  --accent:#3ec4bb;--accent-ink:#05211f;--accent-text:#3ec4bb;--accent-soft:#12332f;
   --good:#4cc786;--warn:#e3a24d;--bad:#ff7b72;--rail:#0a1117;--rail-ink:#aebccb;--rail-on:#ffffff;color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0e151b;--surface:#16202a;--ink:#e6edf3;--mute:#92a3b3;--line:#263543;
-  --accent:#3ec4bb;--accent-ink:#05211f;--accent-soft:#12332f;
+  --accent:#3ec4bb;--accent-ink:#05211f;--accent-text:#3ec4bb;--accent-soft:#12332f;
   --good:#4cc786;--warn:#e3a24d;--bad:#ff7b72;--rail:#0a1117;--rail-ink:#aebccb;--rail-on:#ffffff;color-scheme:dark}
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -61,7 +59,7 @@ h2{font-size:14px;margin:0 0 10px;text-transform:uppercase;letter-spacing:.06em;
 .tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
 .tools input[type=search]{flex:1 1 220px;max-width:360px}
 .chip{all:unset;box-sizing:border-box;cursor:pointer;min-height:40px;padding:0 14px;display:inline-flex;align-items:center;border-radius:20px;border:1px solid var(--line);background:var(--surface);font-size:14px}
-.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-text);font-weight:600}
 .tw{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
 table{border-collapse:collapse;width:100%;min-width:560px}
 th,td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:middle}
@@ -73,7 +71,7 @@ tr[data-act]:hover td{background:var(--accent-soft)}
 tr.tot td{font-weight:600;border-top:2px solid var(--line)}
 tr.sub td{color:var(--mute)}
 .pill{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:600;border:1px solid currentColor}
-.pill.paid,.pill.in{color:var(--good)}.pill.overdue,.pill.exp{color:var(--bad)}.pill.unpaid,.pill.out{color:var(--warn)}.pill.part{color:var(--accent)}
+.pill.paid,.pill.in{color:var(--good)}.pill.overdue,.pill.exp{color:var(--bad)}.pill.unpaid,.pill.out{color:var(--warn)}.pill.part{color:var(--accent-text)}
 .neg{color:var(--bad)}.pos{color:var(--good)}.mute{color:var(--mute)}
 .empty{padding:34px 16px;text-align:center;color:var(--mute)}
 .banner{display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--accent-soft);border:1px solid var(--accent);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:14px}
@@ -111,7 +109,8 @@ label{display:block;font-size:13px;color:var(--mute);margin-bottom:4px;font-weig
 @media (max-width:760px){
   #app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
   #rail{flex-direction:row;overflow-x:auto;overflow-y:hidden;padding:8px max(10px,env(safe-area-inset-right,0px)) 8px max(10px,env(safe-area-inset-left,0px));gap:4px;position:sticky;top:0}
-  .brand,#rail .sep{display:none}
+  #rail .sep{display:none}
+  .brand{display:flex;align-items:center;flex:0 0 auto;padding:0 10px 0 4px}.brand span{display:none}
   #rail button{flex:0 0 auto;padding:0 14px}
   #top,#view{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
   .ln{grid-template-columns:1fr 1fr 1fr}
@@ -127,6 +126,30 @@ label{display:block;font-size:13px;color:var(--mute);margin-bottom:4px;font-weig
 #sync{white-space:nowrap}
 .rt{display:grid;grid-template-columns:150px minmax(100px,1fr) minmax(130px,1fr) 40px;gap:8px;align-items:center;margin-bottom:8px}.rt button{all:unset;cursor:pointer;min-height:40px;display:flex;align-items:center;justify-content:center;color:var(--bad);font-size:20px;border-radius:8px}
 @media (max-width:760px){.rt{grid-template-columns:1fr 1fr}}
+:root[data-accent="red"]{--accent:#c62828;--accent-soft:#fde8e8;--accent-ink:#ffffff;--accent-text:#b71c1c}
+:root[data-accent="yellow"]{--accent:#f2b705;--accent-soft:#fff6d6;--accent-ink:#241a00;--accent-text:#8a6100}
+:root[data-accent="orange"]{--accent:#e65100;--accent-soft:#fde9dc;--accent-ink:#ffffff;--accent-text:#bf360c}
+:root[data-accent="pink"]{--accent:#c2185b;--accent-soft:#fce4ee;--accent-ink:#ffffff;--accent-text:#ad1457}
+:root[data-accent="purple"]{--accent:#6a1b9a;--accent-soft:#f1e5f8;--accent-ink:#ffffff;--accent-text:#6a1b9a}
+:root[data-accent="indigo"]{--accent:#283593;--accent-soft:#e6e9f8;--accent-ink:#ffffff;--accent-text:#283593}
+:root[data-accent="blue"]{--accent:#1565c0;--accent-soft:#e3effc;--accent-ink:#ffffff;--accent-text:#0d47a1}
+:root[data-accent="cyan"]{--accent:#00838f;--accent-soft:#dcf3f5;--accent-ink:#ffffff;--accent-text:#006064}
+:root[data-accent="slate"]{--accent:#37474f;--accent-soft:#e8edf0;--accent-ink:#ffffff;--accent-text:#263238}
+@media (prefers-color-scheme:dark){:root[data-accent="red"]:not([data-theme="light"]){--accent:#ff6b6b;--accent-soft:#3b1818;--accent-ink:#2b0a0a;--accent-text:#ff8a80}}
+@media (prefers-color-scheme:dark){:root[data-accent="yellow"]:not([data-theme="light"]){--accent:#ffd54a;--accent-soft:#3a3010;--accent-ink:#241a00;--accent-text:#ffd54a}}
+@media (prefers-color-scheme:dark){:root[data-accent="orange"]:not([data-theme="light"]){--accent:#ffab40;--accent-soft:#3a2410;--accent-ink:#2a1500;--accent-text:#ffcc80}}
+@media (prefers-color-scheme:dark){:root[data-accent="pink"]:not([data-theme="light"]){--accent:#f48fb1;--accent-soft:#3a1828;--accent-ink:#2e0818;--accent-text:#f8bbd0}}
+@media (prefers-color-scheme:dark){:root[data-accent="purple"]:not([data-theme="light"]){--accent:#ce93d8;--accent-soft:#2d1838;--accent-ink:#240a30;--accent-text:#e1bee7}}
+@media (prefers-color-scheme:dark){:root[data-accent="indigo"]:not([data-theme="light"]){--accent:#9fa8da;--accent-soft:#1d2240;--accent-ink:#101536;--accent-text:#c5cae9}}
+@media (prefers-color-scheme:dark){:root[data-accent="blue"]:not([data-theme="light"]){--accent:#64b5f6;--accent-soft:#14283d;--accent-ink:#08203a;--accent-text:#90caf9}}
+@media (prefers-color-scheme:dark){:root[data-accent="cyan"]:not([data-theme="light"]){--accent:#4dd0e1;--accent-soft:#12313a;--accent-ink:#032a30;--accent-text:#80deea}}
+@media (prefers-color-scheme:dark){:root[data-accent="slate"]:not([data-theme="light"]){--accent:#b0bec5;--accent-soft:#222d33;--accent-ink:#10181c;--accent-text:#cfd8dc}}
+.swatches{display:flex;flex-wrap:wrap;gap:10px}
+.sw{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px 0 8px;border:1px solid var(--line);border-radius:22px;background:var(--surface)}
+.sw span{width:26px;height:26px;border-radius:50%;background:var(--c);display:block}
+.sw[aria-pressed="true"]{border:2px solid var(--ink);font-weight:600}
+.sw:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.bigth th{font-size:14px}
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
 
@@ -145,6 +168,9 @@ label{display:block;font-size:13px;color:var(--mute);margin-bottom:4px;font-weig
 (function(){
 'use strict';
 const KEY='deskbook.v1';
+const ACC=[['green','Green','#0d6e6a'],['red','Red','#c62828'],['yellow','Yellow','#f2b705'],['orange','Orange','#e65100'],['pink','Pink','#c2185b'],['purple','Purple','#6a1b9a'],['indigo','Indigo','#283593'],['blue','Blue','#1565c0'],['cyan','Cyan','#00838f'],['slate','Slate','#37474f']];
+const applyAccent=k=>{document.documentElement.setAttribute('data-accent',ACC.some(a=>a[0]===k)?k:'green')};
+try{applyAccent(localStorage.getItem('deskbook.accent'))}catch(e){applyAccent('green')}
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid=()=>Math.random().toString(36).slice(2,10);
@@ -306,7 +332,7 @@ const opts=(list,sel,blankLabel)=>(blankLabel!=null?`<option value="">${esc(blan
 /* ---------- state + nav ---------- */
 const NAV=[['dash','Dashboard'],['sales','Sales'],['purchases','Purchases'],['money','Money'],['customers','Customers'],['suppliers','Suppliers'],['items','Inventory'],['assets','Assets'],['invest','Investments'],['reports','Reports'],['settings','Settings']];
 const S={view:'dash',q:'',filt:'all',rep:'pl',per:'month',loc:'',mod:''};
-$('#rail').innerHTML=`<div class="brand"><div style="display:flex;align-items:center;gap:9px"><svg width="30" height="30" viewBox="0 0 48 48" aria-hidden="true" style="flex:none"><rect width="48" height="48" rx="11" fill="#0d6e6a"/><path d="M11.5 33V14h5l7.5 9.5L31.500 14h5v19h-5V22.500L24 31.500l-7.500-9V33z" fill="#fff"/><circle cx="37" cy="12" r="2.800" fill="#ffc43d"/></svg><b style="line-height:1.15;font-size:17px">Manager<br>by Riyad</b></div><span id="co"></span></div>`+NAV.map(([k,l],i)=>(i===4||i===7||i===9?'<div class="sep"></div>':'')+`<button data-act="nav" data-v="${k}">${l}</button>`).join('');
+$('#rail').innerHTML=`<div class="brand"><div style="display:flex;align-items:center;gap:9px"><svg width="30" height="30" viewBox="0 0 48 48" aria-hidden="true" style="flex:none"><rect width="48" height="48" rx="11" style="fill:var(--accent)" stroke="#fff" stroke-opacity=".45" stroke-width="1.5"/><path d="M11.5 33V14h5l7.5 9.5L31.500 14h5v19h-5V22.500L24 31.500l-7.500-9V33z" fill="#fff"/><circle cx="37" cy="12" r="2.800" fill="#ffc43d"/></svg><b style="line-height:1.15;font-size:17px">Business<br>Manager</b></div><span id="co"></span></div>`+NAV.map(([k,l],i)=>(i===4||i===7||i===9?'<div class="sep"></div>':'')+`<button data-act="nav" data-v="${k}">${l}</button>`).join('');
 
 const TITLES={dash:'Dashboard',sales:'Sales invoices',purchases:'Purchase bills',money:'Money in and out',customers:'Customers',suppliers:'Suppliers',items:'Inventory',assets:'Fixed assets',invest:'Investments',reports:'Reports',settings:'Settings'};
 function topActs(){
@@ -334,7 +360,7 @@ function render(){
 
 const sampleBanner=()=>db.sample?`<div class="banner"><span><b>Sample data.</b> These records are examples so you can explore. Clear them before entering real figures.</span><button class="btn sm" data-act="clearSample">Clear sample data</button></div>`:'';
 const tools=(ph,chips)=>`<div class="tools"><input type="search" id="q" placeholder="${ph}" value="${esc(S.q)}" aria-label="Search">${(chips||[]).map(([k,l])=>`<button class="chip" data-act="filt" data-v="${k}" aria-pressed="${S.filt===k}">${l}</button>`).join('')}</div><div id="list"></div>`;
-const table=(head,rows,empty)=>rows.length?`<div class="tw"><table><thead><tr>${head.map(h=>`<th class="${h[1]||''}">${h[0]}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`:`<div class="card empty">${empty}</div>`;
+const table=(head,rows,empty,cls)=>rows.length?`<div class="tw ${cls||''}"><table><thead><tr>${head.map(h=>`<th class="${h[1]||''}">${h[0]}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`:`<div class="card empty">${empty}</div>`;
 const match=(q,...f)=>!q||f.join(' ').toLowerCase().includes(q.toLowerCase());
 
 /* ---------- views ---------- */
@@ -408,13 +434,13 @@ VIEWS.items=()=>sampleBanner()+`<div class="tools"><input type="search" id="q" p
   <select id="f_loc" style="width:auto;min-width:170px" aria-label="Filter by location">${opts(listVals('location').map(v=>[v,v]),S.loc,'All locations')}</select>
   <select id="f_mod" style="width:auto;min-width:170px" aria-label="Filter by model">${opts(listVals('model').map(v=>[v,v]),S.mod,'All models')}</select></div><div id="list"></div>`;
 const itemsBase=()=>{
-  const list=db.items.filter(i=>match(S.q,i.name,i.sku,i.model,i.location)&&(!S.loc||i.location===S.loc)&&(!S.mod||i.model===S.mod)).sort((a,b)=>a.name.localeCompare(b.name));
-  return table([['Item'],['Model'],['SKU'],['Location'],['In stock','r'],['Avg cost','r'],['Sell price','r'],['Stock value','r']],
-    list.map(i=>{const s=itemStats(i),low=s.qty<=num(i.reorder);return `<tr data-act="editItem" data-id="${i.id}" tabindex="0"><td>${esc(i.name)}${low?' <span class="pill overdue">Low</span>':''}</td><td>${esc(i.model||'')}</td><td class="num">${esc(i.sku)}</td><td>${esc(i.location||'')}</td><td class="r num ${s.qty<0?'neg':''}">${qty(s.qty)} ${esc(i.unit)}</td><td class="r num">${money(s.avg)}</td><td class="r num">${money(i.price)}</td><td class="r num">${money(s.value)}</td></tr>`}),
-    'No items yet. Add the products you buy and sell.')};
+  const list=db.items.filter(i=>match(S.q,i.name,i.sku,i.model,i.location,i.comments)&&(!S.loc||i.location===S.loc)&&(!S.mod||i.model===S.mod)).sort((a,b)=>a.name.localeCompare(b.name));
+  return table([['Item'],['Model'],['SKU'],['Location'],['In stock','r'],['Avg cost','r'],['Sell price','r'],['Stock value','r'],['Comments']],
+    list.map(i=>{const s=itemStats(i),low=s.qty<=num(i.reorder);return `<tr data-act="editItem" data-id="${i.id}" tabindex="0"><td>${esc(i.name)}${low?' <span class="pill overdue">Low</span>':''}</td><td>${esc(i.model||'')}</td><td class="num">${esc(i.sku)}</td><td>${esc(i.location||'')}</td><td class="r num ${s.qty<0?'neg':''}">${qty(s.qty)} ${esc(i.unit)}</td><td class="r num">${money(s.avg)}</td><td class="r num">${money(i.price)}</td><td class="r num">${money(s.value)}</td><td style="min-width:140px;max-width:260px;white-space:normal">${esc(i.comments||'')}</td></tr>`}),
+    'No items yet. Add the products you buy and sell.','bigth')};
 const adjTable=()=>{const a=(db.adjustments||[]).slice().sort((x,y)=>x.date<y.date?1:-1).slice(0,20);if(!a.length)return '';
   const it=id=>(db.items.find(i=>i.id===id)||{name:'(deleted)'}).name;
-  return `<h2 style="margin:20px 0 8px">Recent stock adjustments</h2>`+table([['Date'],['Item'],['Change','r'],['Reason']],a.map(x=>`<tr data-act="editAdj" data-id="${x.id}" tabindex="0"><td>${fdate(x.date)}</td><td>${esc(it(x.itemId))}</td><td class="r num ${x.qty<0?'neg':'pos'}">${x.qty>0?'+':''}${qty(x.qty)}</td><td>${esc(x.reason)}</td></tr>`),'')};
+  return `<h2 style="margin:20px 0 8px">Recent stock adjustments</h2>`+table([['Date'],['Item'],['Change','r'],['Reason']],a.map(x=>`<tr data-act="editAdj" data-id="${x.id}" tabindex="0"><td>${fdate(x.date)}</td><td>${esc(it(x.itemId))}</td><td class="r num ${x.qty<0?'neg':'pos'}">${x.qty>0?'+':''}${qty(x.qty)}</td><td>${esc(x.reason)}</td></tr>`),'','bigth')};
 LISTS.items=()=>itemsBase()+adjTable();
 
 const accOpts=(sel,blank)=>opts(db.accounts.map(a=>[a.id,a.name]),sel,blank);
@@ -536,6 +562,9 @@ function reportCSV(){const R=buildReport();const out=[R.head.map(h=>csvCell(h[0]
 /* ---------- settings ---------- */
 VIEWS.settings=function(){const st=db.settings;
   return sampleBanner()+`<div class="grid two">
+  <div class="card"><h2>Theme colour</h2>
+    <p class="mute" style="margin-top:0">Pick the main colour for buttons and highlights. It is saved on this device only, so your phone and tablet can use different colours.</p>
+    <div class="swatches">${ACC.map(([k,l,c])=>`<button class="sw" data-act="accent" data-v="${k}" aria-label="${l}" aria-pressed="${(document.documentElement.getAttribute('data-accent')||'green')===k}" style="--c:${c}"><span></span>${l}</button>`).join('')}</div></div>
   <div class="card"><h2>Business</h2>
     <div class="f">${fld('Company name',`<input id="s_co" value="${esc(st.company)}">`)}${fld('Currency symbol',`<input id="s_cur" value="${esc(st.cur)}" maxlength="6">`)}</div>
     <div class="f">${fld('Default tax %',`<input id="s_tax" type="number" step="0.01" value="${st.tax}">`)}${fld('Sales prefix',`<input id="s_pS" value="${esc(st.pS)}">`)}${fld('Purchase prefix',`<input id="s_pP" value="${esc(st.pP)}">`)}</div>
@@ -570,18 +599,19 @@ function partyForm(id,type){
     onSave:s=>{if(!s.name.trim())return 'Enter a name.';if(ex)Object.assign(ex,s,{name:s.name.trim()});else db.parties.push({id:uid(),...s,name:s.name.trim()});return true}})}
 
 function itemForm(id){
-  const ex=id&&db.items.find(i=>i.id===id);const s=ex?{...ex}:{name:'',sku:'',model:'',location:'',unit:'pc',cost:'',price:'',opening:'',reorder:''};
+  const ex=id&&db.items.find(i=>i.id===id);const s=ex?{...ex}:{name:'',sku:'',model:'',location:'',comments:'',unit:'pc',cost:'',price:'',opening:'',reorder:''};
   const pick=(k,label)=>{const vals=listVals(k),cur=s[k];
     return fld(label,`<select data-f="${k}" data-redraw>${opts(vals.map(v=>[v,v]),cur,'None')}<option value="__new" ${cur==='__new'?'selected':''}>+ Add new…</option></select>`+(cur==='__new'?`<input data-f="${k}Text" value="${esc(s[k+'Text']||'')}" placeholder="Type the new ${label.toLowerCase()}" style="margin-top:6px">`:''))};
   openForm({title:ex?'Edit item':'New item',s:s,narrow:true,
     body:s=>`<div class="f">${fld('Item name',inp('name',s.name))}${fld('SKU or code',inp('sku',s.sku))}${fld('Unit',inp('unit',s.unit,'text','placeholder="pc, box, pack"'))}</div>
     <div class="f">${pick('model','Model')}${pick('location','Inventory location')}</div>
+    <div class="f">${fld('Comments',inp('comments',s.comments,'text','placeholder="Any notes about this item"'))}</div>
     <div class="f">${fld('Purchase cost',inp('cost',s.cost,'number','step="any" inputmode="decimal"'))}${fld('Selling price',inp('price',s.price,'number','step="any" inputmode="decimal"'))}</div>
     <div class="f">${fld('Opening stock',inp('opening',s.opening,'number','step="any" inputmode="decimal"'))}${fld('Reorder level',inp('reorder',s.reorder,'number','step="any" inputmode="decimal"'))}</div>
     ${ex?`<p class="mute">In stock now: <b class="num">${qty(itemStats(ex).qty)} ${esc(ex.unit)}</b></p>`:''}`,
     del:ex?()=>{const used=[...db.sales,...db.purchases].some(d=>d.lines.some(l=>l.itemId===id));if(used){toast('Used on invoices. Cannot delete.');return}db.items=db.items.filter(i=>i.id!==id);toast('Deleted')}:null,
     onSave:s=>{if(!s.name.trim())return 'Enter an item name.';const rv=k=>{if(s[k]==='__new'){const t=(s[k+'Text']||'').trim();const key=k==='model'?'models':'locations';if(t&&!(db.settings[key]||[]).includes(t))db.settings[key]=(db.settings[key]||[]).concat(t);return t}return (s[k]||'').trim()};
-      const o={...s,name:s.name.trim(),model:rv('model'),location:rv('location'),cost:num(s.cost),price:num(s.price),opening:num(s.opening),reorder:num(s.reorder)};delete o.modelText;delete o.locationText;if(ex)Object.assign(ex,o);else db.items.push({id:uid(),...o});return true}})}
+      const o={...s,name:s.name.trim(),model:rv('model'),location:rv('location'),comments:(s.comments||'').trim(),cost:num(s.cost),price:num(s.price),opening:num(s.opening),reorder:num(s.reorder)};delete o.modelText;delete o.locationText;if(ex)Object.assign(ex,o);else db.items.push({id:uid(),...o});return true}})}
 
 function acctForm(id){
   const ex=id&&acct(id);const s=ex?{name:ex.name,open:ex.open}:{name:'',open:''};
@@ -592,7 +622,7 @@ function acctForm(id){
 
 /* ---------- import items from Excel / CSV / pasted rows ---------- */
 const IMP=[['name','Item name',/name|product|item|descri|particular|material/i],['sku','SKU or code',/sku|code|part|catalog|barcode|ref/i],['model','Model',/model|variant|type|version/i],['location','Inventory location',/location|rack|shelf|bin|warehouse|store|godown|place/i],['unit','Unit',/unit|uom|pack/i],
-  ['cost','Purchase cost',/cost|purchase|buy|landed|trade|\bdp\b|\btp\b/i],['price','Selling price',/sell|sale|price|mrp|rate|retail/i],['opening','Opening stock',/stock|qty|quantity|opening|balance|on hand/i],['reorder','Reorder level',/reorder|minimum|\bmin\b|safety|threshold/i]];
+  ['cost','Purchase cost',/cost|purchase|buy|landed|trade|\bdp\b|\btp\b/i],['price','Selling price',/sell|sale|price|mrp|rate|retail/i],['opening','Opening stock',/stock|qty|quantity|opening|balance|on hand/i],['reorder','Reorder level',/reorder|minimum|\bmin\b|safety|threshold/i],['comments','Comments',/comment|remark|note|memo|narration/i]];
 const cellTxt=v=>String(v==null?'':v).trim();
 const numTxt=v=>{const n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,''));return isFinite(n)?n:0};
 function impAuto(s){const hdr=num(s.hdr),h=(s.rows[hdr]||[]).map(cellTxt),used=new Set();
@@ -601,7 +631,7 @@ function impHeaderRow(rows){for(let i=0;i<Math.min(rows.length,10);i++){const r=
 function impLoad(s,rows){rows=rows.filter(r=>r.some(c=>cellTxt(c)!==''));if(!rows.length){s.err='No rows found in that file.';return}
   s.rows=rows;s.err='';s.hdr=String(impHeaderRow(rows));impAuto(s)}
 function impParsed(s){const hdr=num(s.hdr),get=(r,f)=>{const i=s['m_'+f];return i===''||i==null?'':r[+i]};
-  return s.rows.slice(hdr+1).map(r=>({name:cellTxt(get(r,'name')),sku:cellTxt(get(r,'sku')),model:cellTxt(get(r,'model')),location:cellTxt(get(r,'location')),unit:cellTxt(get(r,'unit'))||'pc',cost:numTxt(get(r,'cost')),price:numTxt(get(r,'price')),opening:numTxt(get(r,'opening')),reorder:numTxt(get(r,'reorder'))})).filter(x=>x.name)}
+  return s.rows.slice(hdr+1).map(r=>({name:cellTxt(get(r,'name')),sku:cellTxt(get(r,'sku')),model:cellTxt(get(r,'model')),location:cellTxt(get(r,'location')),comments:cellTxt(get(r,'comments')),unit:cellTxt(get(r,'unit'))||'pc',cost:numTxt(get(r,'cost')),price:numTxt(get(r,'price')),opening:numTxt(get(r,'opening')),reorder:numTxt(get(r,'reorder'))})).filter(x=>x.name)}
 function impMatch(list){const bySku=new Map(),byName=new Map();db.items.forEach(i=>{if(i.sku)bySku.set(i.sku.toLowerCase(),i);byName.set(i.name.toLowerCase(),i)});
   return {bySku:bySku,byName:byName,find:x=>(x.sku&&bySku.get(x.sku.toLowerCase()))||byName.get(x.name.toLowerCase())}}
 function importForm(){
@@ -623,7 +653,7 @@ function importForm(){
       ${fld('If an item already exists',`<select data-f="dup">${opts([['skip','Skip it'],['update','Update its details']],s.dup)}</select>`)}</div>
       <div class="f">${IMP.map(([f,l])=>fld(l,`<select data-f="m_${f}" data-redraw>${colOpts(s['m_'+f])}</select>`)).join('')}</div>
       <p><b>${list.length}</b> items found · <b>${list.length-dups}</b> new · <b>${dups}</b> already in your inventory</p>
-      <div class="tw"><table style="min-width:720px"><thead><tr><th>Item</th><th>Model</th><th>SKU</th><th>Location</th><th>Unit</th><th class="r">Cost</th><th class="r">Price</th><th class="r">Stock</th></tr></thead><tbody>${list.slice(0,6).map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.model)}</td><td class="num">${esc(x.sku)}</td><td>${esc(x.location)}</td><td>${esc(x.unit)}</td><td class="r num">${qty(x.cost)}</td><td class="r num">${qty(x.price)}</td><td class="r num">${qty(x.opening)}</td></tr>`).join('')}</tbody></table></div><p class="mute" style="font-size:13px">Showing the first ${Math.min(6,list.length)} rows.</p>`},
+      <div class="tw"><table style="min-width:720px"><thead><tr><th>Item</th><th>Model</th><th>SKU</th><th>Location</th><th>Unit</th><th class="r">Cost</th><th class="r">Price</th><th class="r">Stock</th><th>Comments</th></tr></thead><tbody>${list.slice(0,6).map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.model)}</td><td class="num">${esc(x.sku)}</td><td>${esc(x.location)}</td><td>${esc(x.unit)}</td><td class="r num">${qty(x.cost)}</td><td class="r num">${qty(x.price)}</td><td class="r num">${qty(x.opening)}</td><td>${esc(x.comments)}</td></tr>`).join('')}</tbody></table></div><p class="mute" style="font-size:13px">Showing the first ${Math.min(6,list.length)} rows.</p>`},
     after:(s,bd)=>{const f=bd.querySelector('#imp_file');if(!f)return;
       f.onchange=()=>{const file=f.files&&f.files[0];if(!file)return;
         if(!window.XLSX){s.err='Reading Excel files is not available in this version. Paste the rows instead.';bd.querySelector('[data-m=refresh]').click();return}
@@ -637,8 +667,8 @@ function importForm(){
       if(!list.length)return 'No rows with an item name were found. Check the column choices.';
       const m=impMatch();let add=0,upd=0,skip=0;
       list.forEach(x=>{const ex=m.find(x);
-        if(ex){if(s.dup==='update'){ex.name=x.name;if(x.unit)ex.unit=x.unit;if(x.sku)ex.sku=x.sku;if(x.model)ex.model=x.model;if(x.location)ex.location=x.location;if(x.cost)ex.cost=x.cost;if(x.price)ex.price=x.price;if(x.reorder)ex.reorder=x.reorder;upd++}else skip++}
-        else{const it={id:uid(),name:x.name,sku:x.sku,model:x.model,location:x.location,unit:x.unit,cost:x.cost,price:x.price,opening:x.opening,reorder:x.reorder};db.items.push(it);if(it.sku)m.bySku.set(it.sku.toLowerCase(),it);m.byName.set(it.name.toLowerCase(),it);add++}});
+        if(ex){if(s.dup==='update'){ex.name=x.name;if(x.unit)ex.unit=x.unit;if(x.sku)ex.sku=x.sku;if(x.model)ex.model=x.model;if(x.location)ex.location=x.location;if(x.comments)ex.comments=x.comments;if(x.cost)ex.cost=x.cost;if(x.price)ex.price=x.price;if(x.reorder)ex.reorder=x.reorder;upd++}else skip++}
+        else{const it={id:uid(),name:x.name,sku:x.sku,model:x.model,location:x.location,comments:x.comments,unit:x.unit,cost:x.cost,price:x.price,opening:x.opening,reorder:x.reorder};db.items.push(it);if(it.sku)m.bySku.set(it.sku.toLowerCase(),it);m.byName.set(it.name.toLowerCase(),it);add++}});
       toast('Imported: '+add+' added, '+upd+' updated, '+skip+' skipped');return true}})}
 
 function adjForm(id){
@@ -754,6 +784,7 @@ const ACT={
   editAcct:d=>acctForm(d.id||null),
   clearSample:()=>{const keep=db.settings;db=blank();db.settings.cur=keep.cur;render();toast('Sample data cleared')},
   loadSample:()=>{db=sample();render();toast('Sample data loaded')},
+  accent:d=>{applyAccent(d.v);try{localStorage.setItem('deskbook.accent',d.v)}catch(e){}render()},
   saveLists:()=>{const get=id=>[...new Set($(id).value.split('\n').map(x=>x.trim()).filter(Boolean))];db.settings.models=get('#s_models');db.settings.locations=get('#s_locs');render();toast('Lists saved')},
   saveSettings:()=>{const st=db.settings;st.company=$('#s_co').value.trim()||'My Company';st.cur=$('#s_cur').value;st.tax=num($('#s_tax').value);st.pS=$('#s_pS').value;st.pP=$('#s_pP').value;render();toast('Settings saved')},
   copyBackup:()=>copy(JSON.stringify(db),'Backup copied. Paste it somewhere safe.'),
