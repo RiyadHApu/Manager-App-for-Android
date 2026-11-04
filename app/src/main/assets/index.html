@@ -27,7 +27,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
 #app{display:grid;grid-template-columns:208px minmax(0,1fr);height:100%}
 #rail{background:var(--rail);color:var(--rail-ink);display:flex;flex-direction:column;padding:18px 10px;gap:2px;overflow-y:auto;padding-left:max(10px,env(safe-area-inset-left,0px))}
-.brand{padding:4px 10px 16px}
+tfoot td{font-weight:700;border-top:2px solid var(--line);background:var(--accent-soft);padding:12px 14px}.brand{padding:4px 10px 16px}.brand b{white-space:nowrap}.nv{display:flex;flex-direction:column;gap:2px}
 .brand b{display:block;font-size:19px;color:var(--rail-on);letter-spacing:.2px}
 .brand span{font-size:12px;opacity:.7;display:block;margin-top:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #rail button{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border-radius:8px;font-size:15px}
@@ -108,9 +108,10 @@ label{display:block;font-size:13px;color:var(--mute);margin-bottom:4px;font-weig
 #toast.on{opacity:1}
 @media (max-width:760px){
   #app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
-  #rail{flex-direction:row;overflow-x:auto;overflow-y:hidden;padding:8px max(10px,env(safe-area-inset-right,0px)) 8px max(10px,env(safe-area-inset-left,0px));gap:4px;position:sticky;top:0}
+  #rail{flex-direction:column;overflow:visible;padding:8px 0 6px;gap:2px;position:sticky;top:0;z-index:20}
   #rail .sep{display:none}
-  .brand{display:flex;align-items:center;flex:0 0 auto;padding:0 10px 0 4px}.brand span{display:none}
+  .nv{flex-direction:row;overflow-x:auto;overflow-y:hidden;gap:4px;padding:0 max(10px,env(safe-area-inset-right,0px)) 0 max(10px,env(safe-area-inset-left,0px))}
+  .brand{display:flex;align-items:center;flex:0 0 auto;padding:2px max(14px,env(safe-area-inset-left,0px)) 6px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:6px}.brand span{display:none}
   #rail button{flex:0 0 auto;padding:0 14px}
   #top,#view{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
   .ln{grid-template-columns:1fr 1fr 1fr}
@@ -332,7 +333,7 @@ const opts=(list,sel,blankLabel)=>(blankLabel!=null?`<option value="">${esc(blan
 /* ---------- state + nav ---------- */
 const NAV=[['dash','Dashboard'],['sales','Sales'],['purchases','Purchases'],['money','Money'],['customers','Customers'],['suppliers','Suppliers'],['items','Inventory'],['assets','Assets'],['invest','Investments'],['reports','Reports'],['settings','Settings']];
 const S={view:'dash',q:'',filt:'all',rep:'pl',per:'month',loc:'',mod:''};
-$('#rail').innerHTML=`<div class="brand"><div style="display:flex;align-items:center;gap:9px"><svg width="30" height="30" viewBox="0 0 48 48" aria-hidden="true" style="flex:none"><rect width="48" height="48" rx="11" style="fill:var(--accent)" stroke="#fff" stroke-opacity=".45" stroke-width="1.5"/><path d="M11.5 33V14h5l7.5 9.5L31.500 14h5v19h-5V22.500L24 31.500l-7.500-9V33z" fill="#fff"/><circle cx="37" cy="12" r="2.800" fill="#ffc43d"/></svg><b style="line-height:1.15;font-size:17px">Business<br>Manager</b></div><span id="co"></span></div>`+NAV.map(([k,l],i)=>(i===4||i===7||i===9?'<div class="sep"></div>':'')+`<button data-act="nav" data-v="${k}">${l}</button>`).join('');
+$('#rail').innerHTML=`<div class="brand"><div style="display:flex;align-items:center;gap:9px"><svg width="30" height="30" viewBox="0 0 48 48" aria-hidden="true" style="flex:none"><rect width="48" height="48" rx="11" style="fill:var(--accent)" stroke="#fff" stroke-opacity=".45" stroke-width="1.5"/><path d="M11.5 33V14h5l7.5 9.5L31.500 14h5v19h-5V22.500L24 31.500l-7.500-9V33z" fill="#fff"/><circle cx="37" cy="12" r="2.800" fill="#ffc43d"/></svg><b style="line-height:1.15;font-size:17px">Business Manager</b></div><span id="co"></span></div><nav class="nv">`+NAV.map(([k,l],i)=>(i===4||i===7||i===9?'<div class="sep"></div>':'')+`<button data-act="nav" data-v="${k}">${l}</button>`).join('')+'</nav>';
 
 const TITLES={dash:'Dashboard',sales:'Sales invoices',purchases:'Purchase bills',money:'Money in and out',customers:'Customers',suppliers:'Suppliers',items:'Inventory',assets:'Fixed assets',invest:'Investments',reports:'Reports',settings:'Settings'};
 function topActs(){
@@ -360,7 +361,10 @@ function render(){
 
 const sampleBanner=()=>db.sample?`<div class="banner"><span><b>Sample data.</b> These records are examples so you can explore. Clear them before entering real figures.</span><button class="btn sm" data-act="clearSample">Clear sample data</button></div>`:'';
 const tools=(ph,chips)=>`<div class="tools"><input type="search" id="q" placeholder="${ph}" value="${esc(S.q)}" aria-label="Search">${(chips||[]).map(([k,l])=>`<button class="chip" data-act="filt" data-v="${k}" aria-pressed="${S.filt===k}">${l}</button>`).join('')}</div><div id="list"></div>`;
-const table=(head,rows,empty,cls)=>rows.length?`<div class="tw ${cls||''}"><table><thead><tr>${head.map(h=>`<th class="${h[1]||''}">${h[0]}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`:`<div class="card empty">${empty}</div>`;
+const sumBy=(l,f)=>l.reduce((a,x)=>a+num(f(x)),0);
+const fc=(v,span)=>`<td class="r num"${span?` colspan="${span}"`:''}>${v}</td>`;
+const fl=(t,span)=>`<td colspan="${span}">${t}</td>`;
+const table=(head,rows,empty,cls,foot)=>rows.length?`<div class="tw ${cls||''}"><table><thead><tr>${head.map(h=>`<th class="${h[1]||''}">${h[0]}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody>${foot?`<tfoot><tr>${foot}</tr></tfoot>`:''}</table></div>`:`<div class="card empty">${empty}</div>`;
 const match=(q,...f)=>!q||f.join(' ').toLowerCase().includes(q.toLowerCase());
 
 /* ---------- views ---------- */
@@ -405,7 +409,7 @@ function docList(type){
     if(S.filt==='open')return st!=='Paid';if(S.filt==='over')return st==='Overdue';return st==='Paid'}).sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:a.no<b.no?1:-1);
   return table([['No'],['Date'],[type==='sales'?'Customer':'Supplier'],['Total','r'],['Balance','r'],['Status']],
     list.map(d=>{const st=statusOf(d);return `<tr data-act="openDoc" data-a="${type}" data-id="${d.id}" tabindex="0"><td class="num">${esc(d.no)}</td><td>${fdate(d.date)}</td><td>${esc(pname(d.partyId))}</td><td class="r num">${money(totOf(d))}</td><td class="r num">${money(balOf(d))}</td><td><span class="pill ${pillCls(st)}">${st}</span></td></tr>`}),
-    'No invoices match. Tap the button above to create one.')}
+    'No invoices match. Tap the button above to create one.','',fl(`Total · ${list.length} shown`,3)+fc(money(sumBy(list,totOf)))+fc(money(sumBy(list,balOf)))+'<td></td>')}
 VIEWS.sales=()=>sampleBanner()+tools('Search invoices or customers',[['all','All'],['open','Unpaid'],['over','Overdue'],['paid','Paid']]);
 VIEWS.purchases=()=>sampleBanner()+tools('Search bills or suppliers',[['all','All'],['open','Unpaid'],['over','Overdue'],['paid','Paid']]);
 LISTS.sales=()=>docList('sales');LISTS.purchases=()=>docList('purchases');
@@ -419,13 +423,14 @@ LISTS.money=()=>{
   return table([['Date'],['Type'],['Party or category'],['Account'],['Invoice'],['Amount','r']],
     list.map(p=>{const doc=p.docId&&[...db.sales,...db.purchases].find(d=>d.id===p.docId);
       return `<tr data-act="editPay" data-id="${p.id}" tabindex="0"><td>${fdate(p.date)}</td><td><span class="pill ${p.kind}">${KIND[p.kind]}</span></td><td>${esc(p.kind==='exp'?p.category||'Expense':pname(p.partyId))}${p.note?`<div class="mute" style="font-size:12px">${esc(p.note)}</div>`:''}</td><td>${esc((acct(p.accountId)||{}).name||'')}</td><td class="num">${doc?esc(doc.no):''}</td><td class="r num ${p.kind==='in'?'pos':'neg'}">${p.kind==='in'?'':'-'}${money(p.amount)}</td></tr>`}),
-    'No payments recorded yet.')};
+    'No payments recorded yet.','',(()=>{const rc=sumBy(list.filter(p=>p.kind==='in'),p=>p.amount),pd=sumBy(list.filter(p=>p.kind!=='in'),p=>p.amount);
+      return fl(`Total · ${list.length} shown · Received ${money(rc)} · Paid out ${money(pd)} · Net`,5)+fc(money(rc-pd))})())};
 
 function partyList(t){
   const list=db.parties.filter(p=>p.type===t&&match(S.q,p.name,p.phone,p.email,p.addr)).sort((a,b)=>a.name.localeCompare(b.name));
   return table([['Name'],['Phone'],['Email'],[t==='c'?'Owes you':'You owe','r']],
     list.map(p=>`<tr data-act="openParty" data-id="${p.id}" tabindex="0"><td>${esc(p.name)}</td><td class="num">${esc(p.phone)}</td><td>${esc(p.email)}</td><td class="r num">${money(partyBal(p))}</td></tr>`),
-    t==='c'?'No customers yet.':'No suppliers yet.')}
+    t==='c'?'No customers yet.':'No suppliers yet.','',fl(`Total · ${list.length} shown`,3)+fc(money(sumBy(list,partyBal))))}
 VIEWS.customers=()=>sampleBanner()+tools('Search customers');
 VIEWS.suppliers=()=>sampleBanner()+tools('Search suppliers');
 LISTS.customers=()=>partyList('c');LISTS.suppliers=()=>partyList('s');
@@ -437,7 +442,7 @@ const itemsBase=()=>{
   const list=db.items.filter(i=>match(S.q,i.name,i.sku,i.model,i.location,i.comments)&&(!S.loc||i.location===S.loc)&&(!S.mod||i.model===S.mod)).sort((a,b)=>a.name.localeCompare(b.name));
   return table([['Item'],['Model'],['SKU'],['Location'],['In stock','r'],['Avg cost','r'],['Sell price','r'],['Stock value','r'],['Comments']],
     list.map(i=>{const s=itemStats(i),low=s.qty<=num(i.reorder);return `<tr data-act="editItem" data-id="${i.id}" tabindex="0"><td>${esc(i.name)}${low?' <span class="pill overdue">Low</span>':''}</td><td>${esc(i.model||'')}</td><td class="num">${esc(i.sku)}</td><td>${esc(i.location||'')}</td><td class="r num ${s.qty<0?'neg':''}">${qty(s.qty)} ${esc(i.unit)}</td><td class="r num">${money(s.avg)}</td><td class="r num">${money(i.price)}</td><td class="r num">${money(s.value)}</td><td style="min-width:140px;max-width:260px;white-space:normal">${esc(i.comments||'')}</td></tr>`}),
-    'No items yet. Add the products you buy and sell.','bigth')};
+    'No items yet. Add the products you buy and sell.','bigth',fl(`Total · ${list.length} items shown`,4)+fc(qty(sumBy(list,i=>itemStats(i).qty)))+'<td></td><td></td>'+fc(money(sumBy(list,i=>itemStats(i).value)))+'<td></td>')};
 const adjTable=()=>{const a=(db.adjustments||[]).slice().sort((x,y)=>x.date<y.date?1:-1).slice(0,20);if(!a.length)return '';
   const it=id=>(db.items.find(i=>i.id===id)||{name:'(deleted)'}).name;
   return `<h2 style="margin:20px 0 8px">Recent stock adjustments</h2>`+table([['Date'],['Item'],['Change','r'],['Reason']],a.map(x=>`<tr data-act="editAdj" data-id="${x.id}" tabindex="0"><td>${fdate(x.date)}</td><td>${esc(it(x.itemId))}</td><td class="r num ${x.qty<0?'neg':'pos'}">${x.qty>0?'+':''}${qty(x.qty)}</td><td>${esc(x.reason)}</td></tr>`),'','bigth')};
@@ -451,7 +456,7 @@ LISTS.assets=()=>{
   const list=db.assets.filter(a=>match(S.q,a.name,a.category,a.serial)).filter(a=>S.filt==='all'||(S.filt==='use'?a.status!=='Sold':a.status==='Sold')).sort((a,b)=>a.date<b.date?1:-1);
   return table([['Asset'],['Category'],['Bought'],['Cost','r'],['Book value','r'],['Status']],
     list.map(a=>`<tr data-act="editAsset" data-id="${a.id}" tabindex="0"><td>${esc(a.name)}${a.serial?`<div class="mute" style="font-size:12px">${esc(a.serial)}</div>`:''}</td><td>${esc(a.category)}</td><td>${fdate(a.date)}</td><td class="r num">${money(a.cost)}</td><td class="r num">${money(assetCarry(a))}</td><td><span class="pill ${a.status==='Sold'?'unpaid':'paid'}">${esc(a.status)}</span></td></tr>`),
-    'No assets recorded. Add vehicles, equipment, furniture, property and other things the company owns.')};
+    'No assets recorded. Add vehicles, equipment, furniture, property and other things the company owns.','',fl(`Total · ${list.length} shown`,3)+fc(money(sumBy(list,a=>a.cost)))+fc(money(sumBy(list,assetCarry)))+'<td></td>')};
 function assetForm(id){
   const ex=id&&db.assets.find(a=>a.id===id);
   const s=ex?{...ex}:{name:'',category:'Equipment',date:today(),cost:'',life:'5',salvage:'0',serial:'',status:'In use',accountId:'',soldDate:today(),soldAmount:'',soldAccount:'',note:''};
@@ -480,7 +485,7 @@ LISTS.invest=()=>{
   return table([['Investment'],['Invested','r'],['Value now','r'],['Returns','r'],['Profit or loss','r'],['Matures'],['Status']],
     list.map(i=>{const pr=invProfit(i),late=i.status==='Active'&&i.maturity&&i.maturity<today();
       return `<tr data-act="editInv" data-id="${i.id}" tabindex="0"><td>${esc(i.name)}<div class="mute" style="font-size:12px">${esc(i.type)}${i.institution?' · '+esc(i.institution):''}</div></td><td class="r num">${money(i.amount)}</td><td class="r num">${money(i.status==='Active'?i.value:i.proceeds)}</td><td class="r num">${money(invReturns(i))}</td><td class="r num ${pr<0?'neg':'pos'}">${money(pr)}</td><td class="${late?'neg':''}">${i.maturity?fdate(i.maturity):''}</td><td><span class="pill ${i.status==='Active'?'paid':i.status==='Matured'?'part':'unpaid'}">${esc(i.status)}</span></td></tr>`}),
-    'No investments recorded. Add fixed deposits, shares, savings certificates, land and other investments.')};
+    'No investments recorded. Add fixed deposits, shares, savings certificates, land and other investments.','',fl(`Total · ${list.length} shown`,1)+fc(money(sumBy(list,i=>i.amount)))+fc(money(sumBy(list,i=>i.status==='Active'?i.value:i.proceeds)))+fc(money(sumBy(list,invReturns)))+fc(money(sumBy(list,invProfit)))+'<td></td><td></td>')};
 function invForm(id){
   const ex=id&&db.investments.find(i=>i.id===id);
   const s=ex?{...ex,returns:(ex.returns||[]).map(r=>({...r}))}:{name:'',type:'Fixed deposit',institution:'',date:today(),amount:'',accountId:'',rate:'',maturity:'',status:'Active',value:'',proceeds:'',proceedsDate:today(),proceedsAccount:'',note:'',returns:[]};
