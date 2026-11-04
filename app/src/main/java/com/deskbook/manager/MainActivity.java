@@ -1,7 +1,11 @@
 package com.deskbook.manager;
 
 import android.app.Activity;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
+import android.webkit.ValueCallback;
+import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
@@ -10,7 +14,9 @@ import android.webkit.WebViewClient;
 import androidx.webkit.WebViewAssetLoader;
 
 public class MainActivity extends Activity {
+    private static final int PICK_FILE = 1;
     private WebView web;
+    private ValueCallback<Uri[]> fileCallback;
 
     @Override
     protected void onCreate(Bundle b) {
@@ -30,7 +36,41 @@ public class MainActivity extends Activity {
                 return loader.shouldInterceptRequest(r.getUrl());
             }
         });
+        // Lets the app's "Choose file" button open the tablet's file picker (used by Import from Excel).
+        web.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onShowFileChooser(WebView v, ValueCallback<Uri[]> cb, FileChooserParams params) {
+                if (fileCallback != null) fileCallback.onReceiveValue(null);
+                fileCallback = cb;
+                Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+                i.addCategory(Intent.CATEGORY_OPENABLE);
+                i.setType("*/*");
+                try {
+                    startActivityForResult(Intent.createChooser(i, "Choose file"), PICK_FILE);
+                } catch (Exception e) {
+                    fileCallback = null;
+                    return false;
+                }
+                return true;
+            }
+        });
         web.loadUrl("https://appassets.androidplatform.net/assets/index.html");
+    }
+
+    @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        if (req == PICK_FILE) {
+            if (fileCallback != null) {
+                Uri[] result = null;
+                if (res == RESULT_OK && data != null && data.getData() != null) {
+                    result = new Uri[]{data.getData()};
+                }
+                fileCallback.onReceiveValue(result);
+                fileCallback = null;
+            }
+        } else {
+            super.onActivityResult(req, res, data);
+        }
     }
 
     @Override
