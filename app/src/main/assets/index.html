@@ -157,7 +157,7 @@ const fdate=s=>{if(!s)return '';const [y,m,d]=s.split('-');return `${+d} ${MON[+
 
 /* ---------- data ---------- */
 function blank(){return {v:1,sample:false,
-  settings:{company:'My Company',cur:'৳',tax:0,pS:'INV-',pP:'BILL-'},
+  settings:{company:'My Company',cur:'৳',tax:0,pS:'INV-',pP:'BILL-',models:[],locations:[]},
   accounts:[{id:'cash',name:'Cash in hand',open:0},{id:'bank',name:'Bank account',open:0}],
   seq:{sales:0,purchases:0},parties:[],items:[],sales:[],purchases:[],payments:[],adjustments:[],assets:[],investments:[]}}
 function sample(){
@@ -226,6 +226,7 @@ function acctBal(a){let b=num(a.open);db.payments.forEach(p=>{if(p.accountId!==a
   (db.assets||[]).forEach(x=>{if(x.accountId===a.id)b-=num(x.cost);if(x.status==='Sold'&&x.soldAccount===a.id)b+=num(x.soldAmount)});
   (db.investments||[]).forEach(i=>{if(i.accountId===a.id)b-=num(i.amount);if(i.status!=='Active'&&i.proceedsAccount===a.id)b+=num(i.proceeds);(i.returns||[]).forEach(r=>{if(r.accountId===a.id)b+=num(r.amount)})});
   return b}
+const listVals=k=>{const key=k==='model'?'models':'locations';const set=new Set(db.settings[key]||[]);db.items.forEach(i=>{if(i[k])set.add(i[k])});return [...set].sort((a,b)=>a.localeCompare(b))};
 /* fixed assets: straight-line depreciation */
 function assetDep(a){const cost=num(a.cost),salv=num(a.salvage),life=num(a.life);if(!a.date||life<=0)return 0;
   const end=a.status==='Sold'&&a.soldDate?a.soldDate:today();const yrs=Math.max(0,(new Date(end)-new Date(a.date))/(365.25*864e5));
@@ -304,7 +305,7 @@ const opts=(list,sel,blankLabel)=>(blankLabel!=null?`<option value="">${esc(blan
 
 /* ---------- state + nav ---------- */
 const NAV=[['dash','Dashboard'],['sales','Sales'],['purchases','Purchases'],['money','Money'],['customers','Customers'],['suppliers','Suppliers'],['items','Inventory'],['assets','Assets'],['invest','Investments'],['reports','Reports'],['settings','Settings']];
-const S={view:'dash',q:'',filt:'all',rep:'pl',per:'month'};
+const S={view:'dash',q:'',filt:'all',rep:'pl',per:'month',loc:'',mod:''};
 $('#rail').innerHTML=`<div class="brand"><div style="display:flex;align-items:center;gap:9px"><svg width="30" height="30" viewBox="0 0 48 48" aria-hidden="true" style="flex:none"><rect width="48" height="48" rx="11" fill="#0d6e6a"/><path d="M11.5 33V14h5l7.5 9.5L31.500 14h5v19h-5V22.500L24 31.500l-7.500-9V33z" fill="#fff"/><circle cx="37" cy="12" r="2.800" fill="#ffc43d"/></svg><b style="line-height:1.15;font-size:17px">Manager<br>by Riyad</b></div><span id="co"></span></div>`+NAV.map(([k,l],i)=>(i===4||i===7||i===9?'<div class="sep"></div>':'')+`<button data-act="nav" data-v="${k}">${l}</button>`).join('');
 
 const TITLES={dash:'Dashboard',sales:'Sales invoices',purchases:'Purchase bills',money:'Money in and out',customers:'Customers',suppliers:'Suppliers',items:'Inventory',assets:'Fixed assets',invest:'Investments',reports:'Reports',settings:'Settings'};
@@ -403,9 +404,11 @@ VIEWS.customers=()=>sampleBanner()+tools('Search customers');
 VIEWS.suppliers=()=>sampleBanner()+tools('Search suppliers');
 LISTS.customers=()=>partyList('c');LISTS.suppliers=()=>partyList('s');
 
-VIEWS.items=()=>sampleBanner()+tools('Search item, model, SKU or location');
+VIEWS.items=()=>sampleBanner()+`<div class="tools"><input type="search" id="q" placeholder="Search item, model, SKU or location" value="${esc(S.q)}" aria-label="Search">
+  <select id="f_loc" style="width:auto;min-width:170px" aria-label="Filter by location">${opts(listVals('location').map(v=>[v,v]),S.loc,'All locations')}</select>
+  <select id="f_mod" style="width:auto;min-width:170px" aria-label="Filter by model">${opts(listVals('model').map(v=>[v,v]),S.mod,'All models')}</select></div><div id="list"></div>`;
 const itemsBase=()=>{
-  const list=db.items.filter(i=>match(S.q,i.name,i.sku,i.model,i.location)).sort((a,b)=>a.name.localeCompare(b.name));
+  const list=db.items.filter(i=>match(S.q,i.name,i.sku,i.model,i.location)&&(!S.loc||i.location===S.loc)&&(!S.mod||i.model===S.mod)).sort((a,b)=>a.name.localeCompare(b.name));
   return table([['Item'],['Model'],['SKU'],['Location'],['In stock','r'],['Avg cost','r'],['Sell price','r'],['Stock value','r']],
     list.map(i=>{const s=itemStats(i),low=s.qty<=num(i.reorder);return `<tr data-act="editItem" data-id="${i.id}" tabindex="0"><td>${esc(i.name)}${low?' <span class="pill overdue">Low</span>':''}</td><td>${esc(i.model||'')}</td><td class="num">${esc(i.sku)}</td><td>${esc(i.location||'')}</td><td class="r num ${s.qty<0?'neg':''}">${qty(s.qty)} ${esc(i.unit)}</td><td class="r num">${money(s.avg)}</td><td class="r num">${money(i.price)}</td><td class="r num">${money(s.value)}</td></tr>`}),
     'No items yet. Add the products you buy and sell.')};
@@ -541,6 +544,10 @@ VIEWS.settings=function(){const st=db.settings;
     <table style="min-width:0">${db.accounts.map(a=>`<tr data-act="editAcct" data-id="${a.id}" tabindex="0"><td>${esc(a.name)}</td><td class="r num">${money(acctBal(a))}</td></tr>`).join('')}</table>
     <p><button class="btn" data-act="editAcct" data-id="">Add account</button></p></div>
   </div>
+  <div class="card" style="margin-bottom:14px"><h2>Inventory lists</h2>
+    <p class="mute" style="margin-top:0">These fill the Model and Inventory location dropdowns when you add or edit an item. Write one entry per line. Entries already used by items always stay available.</p>
+    <div class="f">${fld('Models','<textarea id="s_models" style="font-family:var(--sans);font-size:15px;min-height:120px">'+esc(listVals('model').join('\n'))+'</textarea>')}${fld('Inventory locations','<textarea id="s_locs" style="font-family:var(--sans);font-size:15px;min-height:120px">'+esc(listVals('location').join('\n'))+'</textarea>')}</div>
+    <button class="btn pri" data-act="saveLists">Save lists</button></div>
   <div class="card" style="margin-bottom:14px"><h2>Backup and restore</h2>
     <p class="mute" style="margin-top:0">${CLOUD?'Your records live in the company cloud and every signed-in phone and tablet shows the same data. A backup is still a good idea. Restoring replaces the data on all devices.':'Your records are stored in this browser on this tablet only. Copy a backup now and then and keep it somewhere safe, such as a note or an email to yourself. Paste it back here to restore.'}</p>
     <div class="tools"><button class="btn" data-act="copyBackup">Copy backup</button></div>
@@ -564,14 +571,17 @@ function partyForm(id,type){
 
 function itemForm(id){
   const ex=id&&db.items.find(i=>i.id===id);const s=ex?{...ex}:{name:'',sku:'',model:'',location:'',unit:'pc',cost:'',price:'',opening:'',reorder:''};
+  const pick=(k,label)=>{const vals=listVals(k),cur=s[k];
+    return fld(label,`<select data-f="${k}" data-redraw>${opts(vals.map(v=>[v,v]),cur,'None')}<option value="__new" ${cur==='__new'?'selected':''}>+ Add new…</option></select>`+(cur==='__new'?`<input data-f="${k}Text" value="${esc(s[k+'Text']||'')}" placeholder="Type the new ${label.toLowerCase()}" style="margin-top:6px">`:''))};
   openForm({title:ex?'Edit item':'New item',s:s,narrow:true,
     body:s=>`<div class="f">${fld('Item name',inp('name',s.name))}${fld('SKU or code',inp('sku',s.sku))}${fld('Unit',inp('unit',s.unit,'text','placeholder="pc, box, pack"'))}</div>
-    <div class="f">${fld('Model',inp('model',s.model))}${fld('Inventory location',inp('location',s.location,'text','placeholder="Shelf, rack, store or warehouse"'))}</div>
+    <div class="f">${pick('model','Model')}${pick('location','Inventory location')}</div>
     <div class="f">${fld('Purchase cost',inp('cost',s.cost,'number','step="any" inputmode="decimal"'))}${fld('Selling price',inp('price',s.price,'number','step="any" inputmode="decimal"'))}</div>
     <div class="f">${fld('Opening stock',inp('opening',s.opening,'number','step="any" inputmode="decimal"'))}${fld('Reorder level',inp('reorder',s.reorder,'number','step="any" inputmode="decimal"'))}</div>
     ${ex?`<p class="mute">In stock now: <b class="num">${qty(itemStats(ex).qty)} ${esc(ex.unit)}</b></p>`:''}`,
     del:ex?()=>{const used=[...db.sales,...db.purchases].some(d=>d.lines.some(l=>l.itemId===id));if(used){toast('Used on invoices. Cannot delete.');return}db.items=db.items.filter(i=>i.id!==id);toast('Deleted')}:null,
-    onSave:s=>{if(!s.name.trim())return 'Enter an item name.';const o={...s,name:s.name.trim(),model:(s.model||'').trim(),location:(s.location||'').trim(),cost:num(s.cost),price:num(s.price),opening:num(s.opening),reorder:num(s.reorder)};if(ex)Object.assign(ex,o);else db.items.push({id:uid(),...o});return true}})}
+    onSave:s=>{if(!s.name.trim())return 'Enter an item name.';const rv=k=>{if(s[k]==='__new'){const t=(s[k+'Text']||'').trim();const key=k==='model'?'models':'locations';if(t&&!(db.settings[key]||[]).includes(t))db.settings[key]=(db.settings[key]||[]).concat(t);return t}return (s[k]||'').trim()};
+      const o={...s,name:s.name.trim(),model:rv('model'),location:rv('location'),cost:num(s.cost),price:num(s.price),opening:num(s.opening),reorder:num(s.reorder)};delete o.modelText;delete o.locationText;if(ex)Object.assign(ex,o);else db.items.push({id:uid(),...o});return true}})}
 
 function acctForm(id){
   const ex=id&&acct(id);const s=ex?{name:ex.name,open:ex.open}:{name:'',open:''};
@@ -730,7 +740,7 @@ function openParty(id){
 
 /* ---------- actions ---------- */
 const ACT={
-  nav:d=>{S.view=d.v;S.q='';S.filt='all';render();$('#view').scrollTop=0},
+  nav:d=>{S.view=d.v;S.q='';S.filt='all';S.loc='';S.mod='';render();$('#view').scrollTop=0},
   filt:d=>{S.filt=d.v;render()},
   rep:d=>{S.rep=d.v;render()},per:d=>{S.per=d.v;render()},
   csv:()=>copy(reportCSV(),'Report copied as CSV'),
@@ -744,6 +754,7 @@ const ACT={
   editAcct:d=>acctForm(d.id||null),
   clearSample:()=>{const keep=db.settings;db=blank();db.settings.cur=keep.cur;render();toast('Sample data cleared')},
   loadSample:()=>{db=sample();render();toast('Sample data loaded')},
+  saveLists:()=>{const get=id=>[...new Set($(id).value.split('\n').map(x=>x.trim()).filter(Boolean))];db.settings.models=get('#s_models');db.settings.locations=get('#s_locs');render();toast('Lists saved')},
   saveSettings:()=>{const st=db.settings;st.company=$('#s_co').value.trim()||'My Company';st.cur=$('#s_cur').value;st.tax=num($('#s_tax').value);st.pS=$('#s_pS').value;st.pP=$('#s_pP').value;render();toast('Settings saved')},
   copyBackup:()=>copy(JSON.stringify(db),'Backup copied. Paste it somewhere safe.'),
   restore:()=>{const v=$('#restore').value.trim();if(!v)return toast('Paste a backup first');let o;
@@ -755,6 +766,7 @@ const ACT={
 document.addEventListener('click',e=>{const t=e.target.closest('[data-act]');if(!t||t.closest('#modal'))return;ACT[t.dataset.act]&&ACT[t.dataset.act](t.dataset)});
 modal.addEventListener('click',e=>{const t=e.target.closest('tr[data-act]');if(t&&ACT[t.dataset.act]){e.stopPropagation();closeModal();ACT[t.dataset.act](t.dataset)}});
 document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches&&e.target.matches('tr[data-act]')){e.preventDefault();e.target.click()}});
+document.addEventListener('change',e=>{const id=e.target.id;if(id==='f_loc'||id==='f_mod'){if(id==='f_loc')S.loc=e.target.value;else S.mod=e.target.value;const l=$('#list');if(l&&S.view==='items')l.innerHTML=LISTS.items()}});
 document.addEventListener('input',e=>{if(e.target.id==='q'){S.q=e.target.value;const l=$('#list');if(l&&LISTS[S.view])l.innerHTML=LISTS[S.view]()}});
 
 /* ---------- cloud sync (Firebase) ---------- */
