@@ -601,9 +601,9 @@ VIEWS.settings=function(){const st=db.settings;
     <label for="restore">Paste a backup here to restore</label><textarea id="restore" placeholder="{ ... }"></textarea>
     <p><button class="btn" data-act="restore">Restore from backup</button></p></div>
   ${CLOUD?`<div class="card"><h2>Account and sync</h2>
-    <p style="margin-top:0">Signed in as <b>${esc(cloud.user&&cloud.user.email||'')}</b></p>
-    <p class="mute">Changes made on any device appear on the others within a few seconds. Without internet the app keeps working and sends the changes when the connection returns.</p>
-    <button class="btn" data-act="signOut">Sign out</button> <button class="btn" data-act="changeProject">Use a different cloud project</button></div>`
+    <p style="margin-top:0">Signed in as <b>${esc(cloud.user&&cloud.user.email||'')}</b><br><span class="mute">Business: ${esc(db.settings.company)}</span></p>
+    <p class="mute">Each email address has its own separate business data. To work on another business, sign out and sign in with that business's email.</p><p class="mute">Changes made on any device appear on the others within a few seconds. Without internet the app keeps working and sends the changes when the connection returns.</p>
+    <button class="btn" data-act="signOut">Sign out / switch business</button> <button class="btn" data-act="changeProject">Use a different cloud project</button></div>`
   :`<div class="card"><h2>Start over</h2>
     <p class="mute" style="margin-top:0">Removes every record and returns to an empty company. Copy a backup first.</p>
     <button class="btn danger" data-act="wipe">Erase all data</button> <button class="btn" data-act="loadSample">Load sample data</button></div>`}`};
@@ -887,14 +887,17 @@ function beginListen(){
     applySnap(c,snap);cloud.pend[c]=snap.pending;cloud.err='';
     if(!first[c]){first[c]=1;cloud.got++;if(cloud.got===CCOLS.length){cloud.loaded=true;hideGate();render()}}
     scheduleRender()},
-    err=>{if(err&&err.code==='permission-denied'){showGate('<h3>Access not allowed</h3><p class="mute">This account is not on the company access list. Ask the owner to add your email address in the Firestore rules.</p><button class="btn" data-g="out">Sign out</button>')}
+    err=>{if(err&&err.code==='permission-denied'){showGate('<h3>Access not allowed</h3><p class="mute">This account is not allowed to use the database. Check that the Firestore rules from the latest README are published.</p><button class="btn" data-g="out">Sign out</button>')}
       else{cloud.err=(err&&err.code)||'error';paintSync()}}))})}
+/* The first business (created before multi-business support) stays at the top level of the database for this account.
+   Every other sign-in gets its own private space under biz/<uid>/ so the data of different businesses never mixes. */
+const LEGACY_OWNER='rhapu95@gmail.com';
 function startCloud(){
   let cfg=null;try{cfg=JSON.parse(localStorage.getItem(FBCFG)||'null')}catch(e){}
   if(!cfg)return gateSetup();
   try{cloud.h=FB.init(cfg)}catch(e){try{localStorage.removeItem(FBCFG)}catch(x){}return gateSetup('Those settings did not work: '+e.message)}
   showGate('<p class="mute">Starting…</p>');
-  FB.onAuth(cloud.h,u=>{if(u){cloud.user=u;beginListen()}else{cloud.user=null;endListen();gateLogin()}})}
+  FB.onAuth(cloud.h,u=>{if(u){cloud.user=u;cloud.h.base=(u.email||'').toLowerCase()===LEGACY_OWNER?'':'biz/'+u.uid+'/';beginListen()}else{cloud.user=null;endListen();gateLogin()}})}
 document.addEventListener('click',e=>{const t=e.target.closest('[data-g]');if(!t)return;const g=t.dataset.g;
   if(g==='cfg'){const c=parseCfg($('#g_cfg').value);if(!c)return gateSetup('Could not find apiKey and projectId in what you pasted.');
     try{localStorage.setItem(FBCFG,JSON.stringify(c))}catch(x){}startCloud()}
