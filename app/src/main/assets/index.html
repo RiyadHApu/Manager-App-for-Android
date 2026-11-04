@@ -1,7 +1,8 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light dark}body{margin:0}[hidden]{display:none!important}</style></head><body>
 <script src="fb.js"></script>
-<title>Deskbook Manager</title>
+<script src="xlsx.full.min.js"></script>
+<title>Manager by Riyad</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
@@ -30,7 +31,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 #rail{background:var(--rail);color:var(--rail-ink);display:flex;flex-direction:column;padding:18px 10px;gap:2px;overflow-y:auto;padding-left:max(10px,env(safe-area-inset-left,0px))}
 .brand{padding:4px 10px 16px}
 .brand b{display:block;font-size:19px;color:var(--rail-on);letter-spacing:.2px}
-.brand span{font-size:12px;opacity:.7;display:block;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brand span{font-size:12px;opacity:.7;display:block;margin-top:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #rail button{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border-radius:8px;font-size:15px}
 #rail button:hover{background:rgba(255,255,255,.07)}
 #rail button[aria-current="page"]{background:var(--accent);color:var(--accent-ink);font-weight:600}
@@ -124,6 +125,8 @@ label{display:block;font-size:13px;color:var(--mute);margin-bottom:4px;font-weig
 .gate-card h3{margin:0 0 6px;font-size:20px;font-weight:600}
 .gate-card .f{grid-template-columns:1fr}
 #sync{white-space:nowrap}
+.rt{display:grid;grid-template-columns:150px minmax(100px,1fr) minmax(130px,1fr) 40px;gap:8px;align-items:center;margin-bottom:8px}.rt button{all:unset;cursor:pointer;min-height:40px;display:flex;align-items:center;justify-content:center;color:var(--bad);font-size:20px;border-radius:8px}
+@media (max-width:760px){.rt{grid-template-columns:1fr 1fr}}
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
 
@@ -156,7 +159,7 @@ const fdate=s=>{if(!s)return '';const [y,m,d]=s.split('-');return `${+d} ${MON[+
 function blank(){return {v:1,sample:false,
   settings:{company:'My Company',cur:'৳',tax:0,pS:'INV-',pP:'BILL-'},
   accounts:[{id:'cash',name:'Cash in hand',open:0},{id:'bank',name:'Bank account',open:0}],
-  seq:{sales:0,purchases:0},parties:[],items:[],sales:[],purchases:[],payments:[],adjustments:[]}}
+  seq:{sales:0,purchases:0},parties:[],items:[],sales:[],purchases:[],payments:[],adjustments:[],assets:[],investments:[]}}
 function sample(){
   const d=blank();d.sample=true;d.settings.company='Sample Trading Co.';d.settings.tax=5;
   d.accounts[0].open=25000;d.accounts[1].open=400000;
@@ -171,6 +174,7 @@ function sample(){
   const i2=I('Viscoelastic 2 ml','VIS-2','box',1800,2900,20,8);
   const i3=I('Phaco tip 0.9 mm','PT-09','pc',2600,4200,4,5);
   const i4=I('Surgical drape','DR-01','pack',320,540,60,30);
+  [['Model A-20','Shelf A1'],['Standard','Cold store'],['Model PT-09','Shelf B2'],['Sterile','Rack C3']].forEach((m,k)=>{d.items[k].model=m[0];d.items[k].location=m[1]});
   const mk=(type,no,days,pid,lines,tax,due)=>{const x={id:uid(),no:no,date:addDays(today(),-days),due:addDays(today(),-days+due),partyId:pid,lines:lines.map(l=>({itemId:l[0],desc:d.items.find(i=>i.id===l[0]).name,qty:l[1],price:l[2],disc:l[3]||0})),tax:tax,note:''};d[type].push(x);return x};
   const pu1=mk('purchases','BILL-0001',48,s1,[[i1,20,9000],[i3,6,2600]],0,30);
   const pu2=mk('purchases','BILL-0002',20,s2,[[i2,30,1800],[i4,80,320]],0,30);
@@ -187,9 +191,12 @@ function sample(){
   pay('exp',25,'',null,'cash',18000,'Rent');
   pay('exp',9,'',null,'bank',6400,'Transport');
   pay('exp',3,'',null,'cash',2500,'Utilities');
+  d.assets.push({id:uid(),name:'Delivery van',category:'Vehicle',date:addDays(today(),-400),cost:1800000,life:8,salvage:300000,serial:'Dhaka Metro-LA 00-0000',status:'In use',accountId:'',soldDate:'',soldAmount:0,soldAccount:'',note:'Example asset'});
+  d.assets.push({id:uid(),name:'Office computers (3)',category:'Computer',date:addDays(today(),-200),cost:210000,life:4,salvage:0,serial:'',status:'In use',accountId:'',soldDate:'',soldAmount:0,soldAccount:'',note:'Example asset'});
+  d.investments.push({id:uid(),name:'Fixed deposit (example)',type:'Fixed deposit',institution:'Sample Bank',date:addDays(today(),-120),amount:500000,accountId:'',rate:8.5,maturity:addDays(today(),245),status:'Active',value:514000,proceeds:0,proceedsDate:'',proceedsAccount:'',note:'',returns:[{id:uid(),date:addDays(today(),-30),amount:10000,accountId:'bank'}]});
   return d}
 let db=null,warnedStore=false;
-function load(){try{const r=localStorage.getItem(KEY);if(r){const o=JSON.parse(r);if(o&&o.v===1)return o}}catch(e){}return null}
+function load(){try{const r=localStorage.getItem(KEY);if(r){const o=JSON.parse(r);if(o&&o.v===1){o.adjustments=o.adjustments||[];o.assets=o.assets||[];o.investments=o.investments||[];return o}}}catch(e){}return null}
 const CLOUD=!!window.FB;
 function save(){if(CLOUD){pushDiff();return}try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){if(!warnedStore){warnedStore=true;toast('Could not save in this browser. Copy a backup from Settings.')}}}
 db=CLOUD?blank():(load()||sample());
@@ -215,7 +222,22 @@ function itemStats(it){let pq=0,pv=0,sq=0;
   const oq=num(it.opening),base=oq+pq,avg=base>0?(oq*num(it.cost)+pv)/base:num(it.cost),q=base-sq+aq;
   return {qty:q,avg:avg,value:Math.max(q,0)*avg,sold:sq}}
 function partyBal(p){const list=p.type==='c'?db.sales:db.purchases;return list.filter(d=>d.partyId===p.id).reduce((a,d)=>a+balOf(d),0)}
-function acctBal(a){let b=num(a.open);db.payments.forEach(p=>{if(p.accountId!==a.id)return;b+=p.kind==='in'?p.amount:-p.amount});return b}
+function acctBal(a){let b=num(a.open);db.payments.forEach(p=>{if(p.accountId!==a.id)return;b+=p.kind==='in'?p.amount:-p.amount});
+  (db.assets||[]).forEach(x=>{if(x.accountId===a.id)b-=num(x.cost);if(x.status==='Sold'&&x.soldAccount===a.id)b+=num(x.soldAmount)});
+  (db.investments||[]).forEach(i=>{if(i.accountId===a.id)b-=num(i.amount);if(i.status!=='Active'&&i.proceedsAccount===a.id)b+=num(i.proceeds);(i.returns||[]).forEach(r=>{if(r.accountId===a.id)b+=num(r.amount)})});
+  return b}
+/* fixed assets: straight-line depreciation */
+function assetDep(a){const cost=num(a.cost),salv=num(a.salvage),life=num(a.life);if(!a.date||life<=0)return 0;
+  const end=a.status==='Sold'&&a.soldDate?a.soldDate:today();const yrs=Math.max(0,(new Date(end)-new Date(a.date))/(365.25*864e5));
+  return Math.max(0,Math.min(cost-salv,(cost-salv)*yrs/life))}
+const assetBook=a=>Math.max(num(a.cost)-assetDep(a),0);
+const assetCarry=a=>a.status==='Sold'?0:assetBook(a);
+const invReturns=i=>(i.returns||[]).reduce((a,r)=>a+num(r.amount),0);
+const invValue=i=>i.status==='Active'?num(i.value):0;
+const invProfit=i=>(i.status==='Active'?num(i.value):num(i.proceeds))+invReturns(i)-num(i.amount);
+function netWorth(){const cash=db.accounts.reduce((a,x)=>a+acctBal(x),0),rec=db.sales.reduce((a,d)=>a+balOf(d),0),pay=db.purchases.reduce((a,d)=>a+balOf(d),0),
+  stock=db.items.reduce((a,i)=>a+itemStats(i).value,0),fa=db.assets.reduce((a,x)=>a+assetCarry(x),0),inv=db.investments.reduce((a,x)=>a+invValue(x),0);
+  return {cash:cash,rec:rec,stock:stock,fa:fa,inv:inv,pay:pay,total:cash+rec+stock+fa+inv-pay}}
 function range(per){const t=today(),y=t.slice(0,4),m=t.slice(0,7);
   if(per==='month')return [m+'-01',m+'-31'];
   if(per==='last'){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);const s=iso(d).slice(0,7);return [s+'-01',s+'-31']}
@@ -252,7 +274,7 @@ function openForm(cfg){
   draw();
   const onEdit=e=>{const t=e.target,f=t.dataset.f;if(!f)return;
     const v=t.type==='checkbox'?t.checked:t.value;
-    if(t.dataset.l!=null)s.lines[+t.dataset.l][f]=v;else s[f]=v;
+    if(t.dataset.l!=null)s[t.dataset.arr||'lines'][+t.dataset.l][f]=v;else s[f]=v;
     if(e.type==='change'){cfg.onChange&&cfg.onChange(s,f,t.dataset.l!=null?+t.dataset.l:-1);if(t.dataset.redraw!=null)draw()}
     cfg.live&&cfg.live(s,bd)};
   bd.addEventListener('input',onEdit);bd.addEventListener('change',onEdit);
@@ -281,11 +303,11 @@ const inp=(f,v,type,extra)=>`<input data-f="${f}" type="${type||'text'}" value="
 const opts=(list,sel,blankLabel)=>(blankLabel!=null?`<option value="">${esc(blankLabel)}</option>`:'')+list.map(([v,l])=>`<option value="${esc(v)}" ${v===sel?'selected':''}>${esc(l)}</option>`).join('');
 
 /* ---------- state + nav ---------- */
-const NAV=[['dash','Dashboard'],['sales','Sales'],['purchases','Purchases'],['money','Money'],['customers','Customers'],['suppliers','Suppliers'],['items','Inventory'],['reports','Reports'],['settings','Settings']];
+const NAV=[['dash','Dashboard'],['sales','Sales'],['purchases','Purchases'],['money','Money'],['customers','Customers'],['suppliers','Suppliers'],['items','Inventory'],['assets','Assets'],['invest','Investments'],['reports','Reports'],['settings','Settings']];
 const S={view:'dash',q:'',filt:'all',rep:'pl',per:'month'};
-$('#rail').innerHTML=`<div class="brand"><b>Deskbook</b><span id="co"></span></div>`+NAV.map(([k,l],i)=>(i===4||i===7?'<div class="sep"></div>':'')+`<button data-act="nav" data-v="${k}">${l}</button>`).join('');
+$('#rail').innerHTML=`<div class="brand"><div style="display:flex;align-items:center;gap:9px"><svg width="30" height="30" viewBox="0 0 48 48" aria-hidden="true" style="flex:none"><rect width="48" height="48" rx="11" fill="#0d6e6a"/><path d="M11.5 33V14h5l7.5 9.5L31.500 14h5v19h-5V22.500L24 31.500l-7.500-9V33z" fill="#fff"/><circle cx="37" cy="12" r="2.800" fill="#ffc43d"/></svg><b style="line-height:1.15;font-size:17px">Manager<br>by Riyad</b></div><span id="co"></span></div>`+NAV.map(([k,l],i)=>(i===4||i===7||i===9?'<div class="sep"></div>':'')+`<button data-act="nav" data-v="${k}">${l}</button>`).join('');
 
-const TITLES={dash:'Dashboard',sales:'Sales invoices',purchases:'Purchase bills',money:'Money in and out',customers:'Customers',suppliers:'Suppliers',items:'Inventory',reports:'Reports',settings:'Settings'};
+const TITLES={dash:'Dashboard',sales:'Sales invoices',purchases:'Purchase bills',money:'Money in and out',customers:'Customers',suppliers:'Suppliers',items:'Inventory',assets:'Fixed assets',invest:'Investments',reports:'Reports',settings:'Settings'};
 function topActs(){
   const b=(a,l,extra,pri)=>`<button class="btn ${pri?'pri':''}" data-act="${a}" ${extra||''}>${l}</button>`;
   switch(S.view){
@@ -295,7 +317,9 @@ function topActs(){
     case 'money':return b('newPay','Receive','data-k="in"',1)+b('newPay','Pay supplier','data-k="out"')+b('newPay','Expense','data-k="exp"');
     case 'customers':return b('newParty','Add customer','data-t="c"',1);
     case 'suppliers':return b('newParty','Add supplier','data-t="s"',1);
-    case 'items':return b('newItem','Add item','',1)+b('newAdj','Adjust stock');
+    case 'items':return b('newItem','Add item','',1)+b('importItems','Import from Excel')+b('newAdj','Adjust stock');
+    case 'assets':return b('newAsset','Add asset','',1);
+    case 'invest':return b('newInv','Add investment','',1);
   }return ''}
 
 function render(){
@@ -337,6 +361,7 @@ VIEWS.dash=function(){
     <div class="card kpi"><small>Stock value</small><div class="v num">${money(stock)}</div></div>
     <div class="card kpi"><small>Sales this month</small><div class="v num">${money(ms)}</div></div>
     <div class="card kpi"><small>Profit this month</small><div class="v num ${pl.net<0?'neg':'pos'}">${money(pl.net)}</div></div>
+    <div class="card kpi"><small>Net worth</small><div class="v num ${netWorth().total<0?'neg':''}">${money(netWorth().total)}</div></div>
   </div>
   <div class="grid two">
     <div class="card"><h2>Sales, last 6 months</h2><div class="bar">${months.map(x=>`<div><em class="num">${x.v?Math.round(x.v/1000)+'k':''}</em><i style="height:${Math.round(x.v/mx*100)}%"></i><span>${x.l}</span></div>`).join('')}</div></div>
@@ -378,16 +403,77 @@ VIEWS.customers=()=>sampleBanner()+tools('Search customers');
 VIEWS.suppliers=()=>sampleBanner()+tools('Search suppliers');
 LISTS.customers=()=>partyList('c');LISTS.suppliers=()=>partyList('s');
 
-VIEWS.items=()=>sampleBanner()+tools('Search items or SKU');
+VIEWS.items=()=>sampleBanner()+tools('Search item, model, SKU or location');
 const itemsBase=()=>{
-  const list=db.items.filter(i=>match(S.q,i.name,i.sku)).sort((a,b)=>a.name.localeCompare(b.name));
-  return table([['Item'],['SKU'],['In stock','r'],['Avg cost','r'],['Sell price','r'],['Stock value','r']],
-    list.map(i=>{const s=itemStats(i),low=s.qty<=num(i.reorder);return `<tr data-act="editItem" data-id="${i.id}" tabindex="0"><td>${esc(i.name)}${low?' <span class="pill overdue">Low</span>':''}</td><td class="num">${esc(i.sku)}</td><td class="r num ${s.qty<0?'neg':''}">${qty(s.qty)} ${esc(i.unit)}</td><td class="r num">${money(s.avg)}</td><td class="r num">${money(i.price)}</td><td class="r num">${money(s.value)}</td></tr>`}),
+  const list=db.items.filter(i=>match(S.q,i.name,i.sku,i.model,i.location)).sort((a,b)=>a.name.localeCompare(b.name));
+  return table([['Item'],['Model'],['SKU'],['Location'],['In stock','r'],['Avg cost','r'],['Sell price','r'],['Stock value','r']],
+    list.map(i=>{const s=itemStats(i),low=s.qty<=num(i.reorder);return `<tr data-act="editItem" data-id="${i.id}" tabindex="0"><td>${esc(i.name)}${low?' <span class="pill overdue">Low</span>':''}</td><td>${esc(i.model||'')}</td><td class="num">${esc(i.sku)}</td><td>${esc(i.location||'')}</td><td class="r num ${s.qty<0?'neg':''}">${qty(s.qty)} ${esc(i.unit)}</td><td class="r num">${money(s.avg)}</td><td class="r num">${money(i.price)}</td><td class="r num">${money(s.value)}</td></tr>`}),
     'No items yet. Add the products you buy and sell.')};
 const adjTable=()=>{const a=(db.adjustments||[]).slice().sort((x,y)=>x.date<y.date?1:-1).slice(0,20);if(!a.length)return '';
   const it=id=>(db.items.find(i=>i.id===id)||{name:'(deleted)'}).name;
   return `<h2 style="margin:20px 0 8px">Recent stock adjustments</h2>`+table([['Date'],['Item'],['Change','r'],['Reason']],a.map(x=>`<tr data-act="editAdj" data-id="${x.id}" tabindex="0"><td>${fdate(x.date)}</td><td>${esc(it(x.itemId))}</td><td class="r num ${x.qty<0?'neg':'pos'}">${x.qty>0?'+':''}${qty(x.qty)}</td><td>${esc(x.reason)}</td></tr>`),'')};
 LISTS.items=()=>itemsBase()+adjTable();
+
+const accOpts=(sel,blank)=>opts(db.accounts.map(a=>[a.id,a.name]),sel,blank);
+VIEWS.assets=function(){
+  const tc=db.assets.reduce((a,x)=>a+num(x.cost),0),bv=db.assets.reduce((a,x)=>a+assetCarry(x),0),dp=db.assets.filter(x=>x.status!=='Sold').reduce((a,x)=>a+assetDep(x),0);
+  return sampleBanner()+`<div class="grid kpis"><div class="card kpi"><small>Cost of all assets</small><div class="v num">${money(tc)}</div></div><div class="card kpi"><small>Book value now</small><div class="v num">${money(bv)}</div></div><div class="card kpi"><small>Depreciation to date</small><div class="v num">${money(dp)}</div></div><div class="card kpi"><small>Assets in use</small><div class="v num">${db.assets.filter(x=>x.status!=='Sold').length}</div></div></div>`+tools('Search assets, category or serial',[['all','All'],['use','In use'],['sold','Sold']])};
+LISTS.assets=()=>{
+  const list=db.assets.filter(a=>match(S.q,a.name,a.category,a.serial)).filter(a=>S.filt==='all'||(S.filt==='use'?a.status!=='Sold':a.status==='Sold')).sort((a,b)=>a.date<b.date?1:-1);
+  return table([['Asset'],['Category'],['Bought'],['Cost','r'],['Book value','r'],['Status']],
+    list.map(a=>`<tr data-act="editAsset" data-id="${a.id}" tabindex="0"><td>${esc(a.name)}${a.serial?`<div class="mute" style="font-size:12px">${esc(a.serial)}</div>`:''}</td><td>${esc(a.category)}</td><td>${fdate(a.date)}</td><td class="r num">${money(a.cost)}</td><td class="r num">${money(assetCarry(a))}</td><td><span class="pill ${a.status==='Sold'?'unpaid':'paid'}">${esc(a.status)}</span></td></tr>`),
+    'No assets recorded. Add vehicles, equipment, furniture, property and other things the company owns.')};
+function assetForm(id){
+  const ex=id&&db.assets.find(a=>a.id===id);
+  const s=ex?{...ex}:{name:'',category:'Equipment',date:today(),cost:'',life:'5',salvage:'0',serial:'',status:'In use',accountId:'',soldDate:today(),soldAmount:'',soldAccount:'',note:''};
+  const nf=(f,v,x)=>inp(f,v,'number','step="any" inputmode="decimal" '+(x||''));
+  openForm({title:ex?'Edit asset':'New asset',s:s,
+    body:s=>`<div class="f">${fld('Asset name',inp('name',s.name))}${fld('Category',`<input data-f="category" list="acats" value="${esc(s.category)}"><datalist id="acats">${['Equipment','Vehicle','Furniture','Computer','Property','Land','Other'].map(c=>`<option value="${c}">`).join('')}</datalist>`)}</div>
+    <div class="f">${fld('Purchase date',inp('date',s.date,'date'))}${fld('Cost',nf('cost',s.cost))}${fld('Useful life (years)',nf('life',s.life))}${fld('Value left at end of life',nf('salvage',s.salvage))}</div>
+    <div class="f">${fld('Serial number or location',inp('serial',s.serial))}${fld('Paid from account',`<select data-f="accountId">${accOpts(s.accountId,'Not recorded here')}</select>`)}${fld('Status',`<select data-f="status" data-redraw>${opts([['In use','In use'],['Sold','Sold or disposed']],s.status)}</select>`)}</div>
+    ${s.status==='Sold'?`<div class="f">${fld('Sale date',inp('soldDate',s.soldDate,'date'))}${fld('Sold for',nf('soldAmount',s.soldAmount))}${fld('Received into account',`<select data-f="soldAccount">${accOpts(s.soldAccount,'Not recorded here')}</select>`)}</div>`:''}
+    <div class="f">${fld('Note',inp('note',s.note))}</div>
+    <p class="mute" style="font-size:13px" id="dsum">Depreciation to date: <b class="num">${money(assetDep(s))}</b> · Book value: <b class="num">${money(num(s.cost)-assetDep(s))}</b>${s.status==='Sold'?` · Gain or loss on sale: <b class="num">${money(num(s.soldAmount)-(num(s.cost)-assetDep(s)))}</b>`:''}<br>Straight-line method. Choosing an account takes the cost out of that account's balance.</p>`,
+    live:(s,bd)=>{const e=bd.querySelector('#dsum');if(e&&s.status!=='Sold'){const b=e.querySelectorAll('b');if(b[0])b[0].textContent=money(assetDep(s));if(b[1])b[1].textContent=money(num(s.cost)-assetDep(s))}},
+    del:ex?()=>{db.assets=db.assets.filter(a=>a.id!==id);toast('Deleted')}:null,
+    onSave:s=>{if(!s.name.trim())return 'Enter the asset name.';if(num(s.cost)<=0)return 'Enter the cost.';
+      const sold=s.status==='Sold';
+      const o={name:s.name.trim(),category:(s.category||'').trim(),date:s.date||today(),cost:num(s.cost),life:num(s.life),salvage:num(s.salvage),serial:s.serial||'',status:s.status,accountId:s.accountId||'',
+        soldDate:sold?(s.soldDate||today()):'',soldAmount:sold?num(s.soldAmount):0,soldAccount:sold?(s.soldAccount||''):'',note:s.note||''};
+      if(ex)Object.assign(ex,o);else db.assets.push({id:uid(),...o});return true}})}
+
+VIEWS.invest=function(){
+  const act=db.investments.filter(i=>i.status==='Active');
+  const inv=act.reduce((a,i)=>a+num(i.amount),0),val=act.reduce((a,i)=>a+num(i.value),0),ret=db.investments.reduce((a,i)=>a+invReturns(i),0),pr=db.investments.reduce((a,i)=>a+invProfit(i),0);
+  return sampleBanner()+`<div class="grid kpis"><div class="card kpi"><small>Invested (active)</small><div class="v num">${money(inv)}</div></div><div class="card kpi"><small>Current value</small><div class="v num">${money(val)}</div></div><div class="card kpi"><small>Returns received</small><div class="v num">${money(ret)}</div></div><div class="card kpi"><small>Total profit or loss</small><div class="v num ${pr<0?'neg':'pos'}">${money(pr)}</div></div></div>`+tools('Search investments',[['all','All'],['act','Active'],['done','Closed']])};
+LISTS.invest=()=>{
+  const list=db.investments.filter(i=>match(S.q,i.name,i.type,i.institution)).filter(i=>S.filt==='all'||(S.filt==='act'?i.status==='Active':i.status!=='Active')).sort((a,b)=>a.date<b.date?1:-1);
+  return table([['Investment'],['Invested','r'],['Value now','r'],['Returns','r'],['Profit or loss','r'],['Matures'],['Status']],
+    list.map(i=>{const pr=invProfit(i),late=i.status==='Active'&&i.maturity&&i.maturity<today();
+      return `<tr data-act="editInv" data-id="${i.id}" tabindex="0"><td>${esc(i.name)}<div class="mute" style="font-size:12px">${esc(i.type)}${i.institution?' · '+esc(i.institution):''}</div></td><td class="r num">${money(i.amount)}</td><td class="r num">${money(i.status==='Active'?i.value:i.proceeds)}</td><td class="r num">${money(invReturns(i))}</td><td class="r num ${pr<0?'neg':'pos'}">${money(pr)}</td><td class="${late?'neg':''}">${i.maturity?fdate(i.maturity):''}</td><td><span class="pill ${i.status==='Active'?'paid':i.status==='Matured'?'part':'unpaid'}">${esc(i.status)}</span></td></tr>`}),
+    'No investments recorded. Add fixed deposits, shares, savings certificates, land and other investments.')};
+function invForm(id){
+  const ex=id&&db.investments.find(i=>i.id===id);
+  const s=ex?{...ex,returns:(ex.returns||[]).map(r=>({...r}))}:{name:'',type:'Fixed deposit',institution:'',date:today(),amount:'',accountId:'',rate:'',maturity:'',status:'Active',value:'',proceeds:'',proceedsDate:today(),proceedsAccount:'',note:'',returns:[]};
+  const nf=(f,v)=>inp(f,v,'number','step="any" inputmode="decimal"');
+  const types=['Fixed deposit','Savings certificate','Shares','Mutual fund','Bond','Land or property','Business stake','Other'];
+  const retRow=(r,i)=>`<div class="rt"><input data-arr="returns" data-l="${i}" data-f="date" type="date" value="${esc(r.date)}" aria-label="Date"><input data-arr="returns" data-l="${i}" data-f="amount" type="number" step="any" inputmode="decimal" value="${esc(r.amount)}" placeholder="Amount" aria-label="Amount"><select data-arr="returns" data-l="${i}" data-f="accountId" aria-label="Received into">${accOpts(r.accountId,'Not recorded here')}</select><button data-m="rmr" data-i="${i}" aria-label="Remove">×</button></div>`;
+  openForm({title:ex?'Edit investment':'New investment',s:s,
+    body:s=>`<div class="f">${fld('Name',inp('name',s.name))}${fld('Type',`<select data-f="type">${opts(types.map(t=>[t,t]),s.type)}</select>`)}${fld('Bank or institution',inp('institution',s.institution))}</div>
+    <div class="f">${fld('Date invested',inp('date',s.date,'date'))}${fld('Amount invested',nf('amount',s.amount))}${fld('Paid from account',`<select data-f="accountId">${accOpts(s.accountId,'Not recorded here')}</select>`)}</div>
+    <div class="f">${fld('Expected return % a year',nf('rate',s.rate))}${fld('Maturity date',inp('maturity',s.maturity,'date'))}${fld('Status',`<select data-f="status" data-redraw>${opts([['Active','Active'],['Matured','Matured, paid out'],['Sold','Sold']],s.status)}</select>`)}</div>
+    ${s.status==='Active'?`<div class="f">${fld('Current value',nf('value',s.value))}</div>`:`<div class="f">${fld('Amount received',nf('proceeds',s.proceeds))}${fld('Date received',inp('proceedsDate',s.proceedsDate,'date'))}${fld('Received into account',`<select data-f="proceedsAccount">${accOpts(s.proceedsAccount,'Not recorded here')}</select>`)}</div>`}
+    <h2 style="margin-top:6px">Interest and dividends received</h2>
+    ${s.returns.map(retRow).join('')}<button class="btn sm" data-m="addr">+ Add return</button>
+    <div class="f" style="margin-top:14px">${fld('Note',inp('note',s.note))}</div>`,
+    onAct:(m,d,s)=>{if(m==='addr')s.returns.push({id:uid(),date:today(),amount:'',accountId:''});if(m==='rmr')s.returns.splice(+d.i,1)},
+    del:ex?()=>{db.investments=db.investments.filter(i=>i.id!==id);toast('Deleted')}:null,
+    onSave:s=>{if(!s.name.trim())return 'Enter a name.';if(num(s.amount)<=0)return 'Enter the amount invested.';
+      const act=s.status==='Active';
+      const o={name:s.name.trim(),type:s.type,institution:s.institution||'',date:s.date||today(),amount:num(s.amount),accountId:s.accountId||'',rate:num(s.rate),maturity:s.maturity||'',status:s.status,
+        value:act?num(s.value):0,proceeds:act?0:num(s.proceeds),proceedsDate:act?'':(s.proceedsDate||today()),proceedsAccount:act?'':(s.proceedsAccount||''),note:s.note||'',
+        returns:s.returns.filter(r=>num(r.amount)>0).map(r=>({id:r.id||uid(),date:r.date||today(),amount:num(r.amount),accountId:r.accountId||''}))};
+      if(ex)Object.assign(ex,o);else db.investments.push({id:uid(),...o});return true}})}
 
 /* ---------- reports ---------- */
 function profitLoss(r){
@@ -418,14 +504,22 @@ function buildReport(){
     const sum=[0,0,0,0];rows.forEach(r=>r.slice(1,5).forEach((c,i)=>sum[i]+=c.m));
     rows.push({b:['Total',...sum.map(M),M(sum.reduce((a,b)=>a+b,0))]});
     return {head:[[S.rep==='ar'?'Customer':'Supplier'],['Not due','r'],['1–30 days','r'],['31–60 days','r'],['Over 60','r'],['Total','r']],rows:rows}}
-  if(S.rep==='stock'){let tv=0;const rows=db.items.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(i=>{const s=itemStats(i);tv+=s.value;return [i.name,Q(s.qty),M(s.avg),M(s.value)]});
-    rows.push({b:['Total','','',M(tv)]});
-    return {head:[['Item'],['Quantity','r'],['Avg cost','r'],['Value','r']],rows:rows}}
+  if(S.rep==='nw'){const n=netWorth();
+    return {head:[['Net worth today'],['Amount','r']],rows:[['Cash and bank',M(n.cash)],['Customers owe you',M(n.rec)],['Stock at cost',M(n.stock)],['Fixed assets (book value)',M(n.fa)],['Investments (current value)',M(n.inv)],{b:['Total what you own',M(n.cash+n.rec+n.stock+n.fa+n.inv)]},['Owed to suppliers',M(-n.pay)],{b:['Net worth',M(n.total)]}]}}
+  if(S.rep==='fa'){let c=0,d=0,b=0;const rows=db.assets.slice().sort((x,y)=>x.name.localeCompare(y.name)).map(a=>{const dep=a.status==='Sold'?assetDep(a):assetDep(a),bk=assetCarry(a);c+=num(a.cost);d+=dep;b+=bk;return [a.name+(a.status==='Sold'?' (sold)':''),a.date?fdate(a.date):'',M(num(a.cost)),M(dep),M(bk)]});
+    rows.push({b:['Total','',M(c),M(d),M(b)]});
+    return {head:[['Asset'],['Bought'],['Cost','r'],['Depreciation','r'],['Book value','r']],rows:rows}}
+  if(S.rep==='inv'){let a1=0,v1=0,r1=0,p1=0;const rows=db.investments.slice().sort((x,y)=>x.name.localeCompare(y.name)).map(i=>{const v=i.status==='Active'?num(i.value):num(i.proceeds),r=invReturns(i),p=invProfit(i);a1+=num(i.amount);v1+=v;r1+=r;p1+=p;return [i.name+' ('+i.status+')',M(num(i.amount)),M(v),M(r),M(p)]});
+    rows.push({b:['Total',M(a1),M(v1),M(r1),M(p1)]});
+    return {head:[['Investment'],['Invested','r'],['Value or proceeds','r'],['Returns','r'],['Profit or loss','r']],rows:rows}}
+  if(S.rep==='stock'){let tv=0;const rows=db.items.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(i=>{const s=itemStats(i);tv+=s.value;return [i.name,i.model||'',i.location||'',Q(s.qty),M(s.avg),M(s.value)]});
+    rows.push({b:['Total','','','','',M(tv)]});
+    return {head:[['Item'],['Model'],['Location'],['Quantity','r'],['Avg cost','r'],['Value','r']],rows:rows}}
   const rows=db.accounts.map(a=>[a.name,M(acctBal(a))]);rows.push({b:['Total',M(db.accounts.reduce((a,x)=>a+acctBal(x),0))]});
   return {head:[['Account'],['Balance','r']],rows:rows}}
 const cellH=c=>c&&c.m!=null?`<td class="r num ${c.m<0?'neg':''}">${money(c.m)}</td>`:c&&c.q!=null?`<td class="r num">${qty(c.q)}</td>`:`<td>${esc(c)}</td>`;
 VIEWS.reports=function(){
-  const tabs=[['pl','Profit and loss'],['sales','Sales by customer'],['ar','Receivables aging'],['ap','Payables aging'],['stock','Stock valuation'],['acc','Cash and bank']];
+  const tabs=[['pl','Profit and loss'],['sales','Sales by customer'],['ar','Receivables aging'],['ap','Payables aging'],['stock','Stock valuation'],['acc','Cash and bank'],['nw','Net worth'],['fa','Asset register'],['inv','Investments']];
   const R=buildReport();
   const body=R.rows.map(r=>{const bold=!Array.isArray(r),cells=bold?(r.b||r.h):r;
     return `<tr class="${r.b?'tot':''}">${cells.map((c,i)=>{const h=cellH(c);return (r.h&&i===0)?`<td class="mute" style="font-size:12px;text-transform:uppercase;letter-spacing:.05em">${esc(c)}</td>`:h}).join('')}</tr>`}).join('');
@@ -469,21 +563,73 @@ function partyForm(id,type){
     onSave:s=>{if(!s.name.trim())return 'Enter a name.';if(ex)Object.assign(ex,s,{name:s.name.trim()});else db.parties.push({id:uid(),...s,name:s.name.trim()});return true}})}
 
 function itemForm(id){
-  const ex=id&&db.items.find(i=>i.id===id);const s=ex?{...ex}:{name:'',sku:'',unit:'pc',cost:'',price:'',opening:'',reorder:''};
+  const ex=id&&db.items.find(i=>i.id===id);const s=ex?{...ex}:{name:'',sku:'',model:'',location:'',unit:'pc',cost:'',price:'',opening:'',reorder:''};
   openForm({title:ex?'Edit item':'New item',s:s,narrow:true,
     body:s=>`<div class="f">${fld('Item name',inp('name',s.name))}${fld('SKU or code',inp('sku',s.sku))}${fld('Unit',inp('unit',s.unit,'text','placeholder="pc, box, pack"'))}</div>
+    <div class="f">${fld('Model',inp('model',s.model))}${fld('Inventory location',inp('location',s.location,'text','placeholder="Shelf, rack, store or warehouse"'))}</div>
     <div class="f">${fld('Purchase cost',inp('cost',s.cost,'number','step="any" inputmode="decimal"'))}${fld('Selling price',inp('price',s.price,'number','step="any" inputmode="decimal"'))}</div>
     <div class="f">${fld('Opening stock',inp('opening',s.opening,'number','step="any" inputmode="decimal"'))}${fld('Reorder level',inp('reorder',s.reorder,'number','step="any" inputmode="decimal"'))}</div>
     ${ex?`<p class="mute">In stock now: <b class="num">${qty(itemStats(ex).qty)} ${esc(ex.unit)}</b></p>`:''}`,
     del:ex?()=>{const used=[...db.sales,...db.purchases].some(d=>d.lines.some(l=>l.itemId===id));if(used){toast('Used on invoices. Cannot delete.');return}db.items=db.items.filter(i=>i.id!==id);toast('Deleted')}:null,
-    onSave:s=>{if(!s.name.trim())return 'Enter an item name.';const o={...s,name:s.name.trim(),cost:num(s.cost),price:num(s.price),opening:num(s.opening),reorder:num(s.reorder)};if(ex)Object.assign(ex,o);else db.items.push({id:uid(),...o});return true}})}
+    onSave:s=>{if(!s.name.trim())return 'Enter an item name.';const o={...s,name:s.name.trim(),model:(s.model||'').trim(),location:(s.location||'').trim(),cost:num(s.cost),price:num(s.price),opening:num(s.opening),reorder:num(s.reorder)};if(ex)Object.assign(ex,o);else db.items.push({id:uid(),...o});return true}})}
 
 function acctForm(id){
   const ex=id&&acct(id);const s=ex?{name:ex.name,open:ex.open}:{name:'',open:''};
   openForm({title:ex?'Edit account':'New account',s:s,narrow:true,
     body:s=>`<div class="f">${fld('Account name',inp('name',s.name))}${fld('Opening balance',inp('open',s.open,'number','step="any" inputmode="decimal"'))}</div>`,
-    del:ex?()=>{if(db.payments.some(p=>p.accountId===id)){toast('Has payments. Cannot delete.');return}db.accounts=db.accounts.filter(a=>a.id!==id);toast('Deleted')}:null,
+    del:ex?()=>{if(db.payments.some(p=>p.accountId===id)||db.assets.some(a=>a.accountId===id||a.soldAccount===id)||db.investments.some(i=>i.accountId===id||i.proceedsAccount===id||(i.returns||[]).some(r=>r.accountId===id))){toast('Has payments. Cannot delete.');return}db.accounts=db.accounts.filter(a=>a.id!==id);toast('Deleted')}:null,
     onSave:s=>{if(!s.name.trim())return 'Enter a name.';if(ex){ex.name=s.name.trim();ex.open=num(s.open)}else db.accounts.push({id:uid(),name:s.name.trim(),open:num(s.open)});return true}})}
+
+/* ---------- import items from Excel / CSV / pasted rows ---------- */
+const IMP=[['name','Item name',/name|product|item|descri|particular|material/i],['sku','SKU or code',/sku|code|part|catalog|barcode|ref/i],['model','Model',/model|variant|type|version/i],['location','Inventory location',/location|rack|shelf|bin|warehouse|store|godown|place/i],['unit','Unit',/unit|uom|pack/i],
+  ['cost','Purchase cost',/cost|purchase|buy|landed|trade|\bdp\b|\btp\b/i],['price','Selling price',/sell|sale|price|mrp|rate|retail/i],['opening','Opening stock',/stock|qty|quantity|opening|balance|on hand/i],['reorder','Reorder level',/reorder|minimum|\bmin\b|safety|threshold/i]];
+const cellTxt=v=>String(v==null?'':v).trim();
+const numTxt=v=>{const n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,''));return isFinite(n)?n:0};
+function impAuto(s){const hdr=num(s.hdr),h=(s.rows[hdr]||[]).map(cellTxt),used=new Set();
+  IMP.forEach(([f,,re])=>{let idx='';for(let i=0;i<h.length;i++){if(!used.has(i)&&h[i]&&re.test(h[i])){idx=i;used.add(i);break}}s['m_'+f]=idx})}
+function impHeaderRow(rows){for(let i=0;i<Math.min(rows.length,10);i++){const r=rows[i]||[];if(r.filter(c=>cellTxt(c)).length>=2&&r.some(c=>IMP[0][2].test(cellTxt(c))))return i}return 0}
+function impLoad(s,rows){rows=rows.filter(r=>r.some(c=>cellTxt(c)!==''));if(!rows.length){s.err='No rows found in that file.';return}
+  s.rows=rows;s.err='';s.hdr=String(impHeaderRow(rows));impAuto(s)}
+function impParsed(s){const hdr=num(s.hdr),get=(r,f)=>{const i=s['m_'+f];return i===''||i==null?'':r[+i]};
+  return s.rows.slice(hdr+1).map(r=>({name:cellTxt(get(r,'name')),sku:cellTxt(get(r,'sku')),model:cellTxt(get(r,'model')),location:cellTxt(get(r,'location')),unit:cellTxt(get(r,'unit'))||'pc',cost:numTxt(get(r,'cost')),price:numTxt(get(r,'price')),opening:numTxt(get(r,'opening')),reorder:numTxt(get(r,'reorder'))})).filter(x=>x.name)}
+function impMatch(list){const bySku=new Map(),byName=new Map();db.items.forEach(i=>{if(i.sku)bySku.set(i.sku.toLowerCase(),i);byName.set(i.name.toLowerCase(),i)});
+  return {bySku:bySku,byName:byName,find:x=>(x.sku&&bySku.get(x.sku.toLowerCase()))||byName.get(x.name.toLowerCase())}}
+function importForm(){
+  const s={rows:[],hdr:'0',dup:'skip',paste:'',err:'',file:''};
+  IMP.forEach(([f])=>s['m_'+f]='');
+  openForm({title:'Import items from Excel',s:s,saveLabel:'Import items',
+    body:s=>{
+      const top=`<p class="mute" style="margin-top:0">Choose an Excel file (.xlsx, .xls) or a CSV file. The first row should have column names such as Name, SKU, Unit, Cost, Price, Stock. You can also paste rows copied from Excel.</p>
+      <div class="f"><div><label for="imp_file">Excel or CSV file</label><input id="imp_file" type="file" accept=".xlsx,.xls,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"></div></div>
+      <div class="f"><div><label for="imp_paste">Or paste rows copied from Excel</label><textarea id="imp_paste" data-f="paste" placeholder="Name	SKU	Unit	Cost	Price	Stock">${esc(s.paste)}</textarea></div></div>
+      <p><button class="btn sm" data-m="readpaste">Read pasted rows</button> <button hidden data-m="refresh"></button></p>
+      <div class="err" style="text-align:left;flex:none">${esc(s.err)}</div>`;
+      if(!s.rows.length)return top;
+      const hdrRows=Math.min(s.rows.length,10),h=(s.rows[num(s.hdr)]||[]).map(cellTxt);
+      const colOpts=sel=>`<option value="">Not in my file</option>`+h.map((t,i)=>`<option value="${i}" ${String(sel)===String(i)?'selected':''}>${esc(t||'(empty heading)')}</option>`).join('');
+      const list=impParsed(s),m=impMatch(),dups=list.filter(x=>m.find(x)).length;
+      return top+`<h2>Match your columns</h2>
+      <div class="f">${fld('Headings are in row',`<select data-f="hdr" data-redraw>${Array.from({length:hdrRows},(_,i)=>`<option value="${i}" ${String(s.hdr)===String(i)?'selected':''}>Row ${i+1}</option>`).join('')}</select>`)}
+      ${fld('If an item already exists',`<select data-f="dup">${opts([['skip','Skip it'],['update','Update its details']],s.dup)}</select>`)}</div>
+      <div class="f">${IMP.map(([f,l])=>fld(l,`<select data-f="m_${f}" data-redraw>${colOpts(s['m_'+f])}</select>`)).join('')}</div>
+      <p><b>${list.length}</b> items found · <b>${list.length-dups}</b> new · <b>${dups}</b> already in your inventory</p>
+      <div class="tw"><table style="min-width:720px"><thead><tr><th>Item</th><th>Model</th><th>SKU</th><th>Location</th><th>Unit</th><th class="r">Cost</th><th class="r">Price</th><th class="r">Stock</th></tr></thead><tbody>${list.slice(0,6).map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.model)}</td><td class="num">${esc(x.sku)}</td><td>${esc(x.location)}</td><td>${esc(x.unit)}</td><td class="r num">${qty(x.cost)}</td><td class="r num">${qty(x.price)}</td><td class="r num">${qty(x.opening)}</td></tr>`).join('')}</tbody></table></div><p class="mute" style="font-size:13px">Showing the first ${Math.min(6,list.length)} rows.</p>`},
+    after:(s,bd)=>{const f=bd.querySelector('#imp_file');if(!f)return;
+      f.onchange=()=>{const file=f.files&&f.files[0];if(!file)return;
+        if(!window.XLSX){s.err='Reading Excel files is not available in this version. Paste the rows instead.';bd.querySelector('[data-m=refresh]').click();return}
+        const rd=new FileReader();rd.onload=()=>{try{const wb=XLSX.read(new Uint8Array(rd.result),{type:'array'});let rows=[];
+            for(const n of wb.SheetNames){rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:'',raw:true});if(rows.some(r=>r.some(c=>cellTxt(c)!=='')))break}
+            impLoad(s,rows)}catch(e){s.err='Could not read that file.'}bd.querySelector('[data-m=refresh]').click()};
+        rd.onerror=()=>{s.err='Could not read that file.';bd.querySelector('[data-m=refresh]').click()};rd.readAsArrayBuffer(file)}},
+    onAct:(m,d,s)=>{if(m==='readpaste'){const t=s.paste.replace(/\r/g,'').split('\n').filter(l=>l.trim()!=='');
+        if(!t.length){s.err='Paste some rows first.';return}const sep=t.some(l=>l.includes('\t'))?'\t':',';impLoad(s,t.map(l=>l.split(sep)))}},
+    onSave:s=>{if(!s.rows.length)return 'Choose a file or paste rows first.';const list=impParsed(s);
+      if(!list.length)return 'No rows with an item name were found. Check the column choices.';
+      const m=impMatch();let add=0,upd=0,skip=0;
+      list.forEach(x=>{const ex=m.find(x);
+        if(ex){if(s.dup==='update'){ex.name=x.name;if(x.unit)ex.unit=x.unit;if(x.sku)ex.sku=x.sku;if(x.model)ex.model=x.model;if(x.location)ex.location=x.location;if(x.cost)ex.cost=x.cost;if(x.price)ex.price=x.price;if(x.reorder)ex.reorder=x.reorder;upd++}else skip++}
+        else{const it={id:uid(),name:x.name,sku:x.sku,model:x.model,location:x.location,unit:x.unit,cost:x.cost,price:x.price,opening:x.opening,reorder:x.reorder};db.items.push(it);if(it.sku)m.bySku.set(it.sku.toLowerCase(),it);m.byName.set(it.name.toLowerCase(),it);add++}});
+      toast('Imported: '+add+' added, '+upd+' updated, '+skip+' skipped');return true}})}
 
 function adjForm(id){
   const ex=id&&(db.adjustments||[]).find(a=>a.id===id);const s=ex?{...ex}:{itemId:'',date:today(),qty:'',reason:'Stock count'};
@@ -501,7 +647,7 @@ function docForm(type,id,pre){
   const s=ex?JSON.parse(JSON.stringify(ex)):{no:nextNo(type),date:today(),due:addDays(today(),30),partyId:(pre&&pre.partyId)||'',lines:[{itemId:'',desc:'',qty:1,price:'',disc:''}],tax:db.settings.tax,note:''};
   if(!ex)s.autoNo=s.no;
   const plist=db.parties.filter(p=>p.type===(isS?'c':'s')).sort((a,b)=>a.name.localeCompare(b.name)).map(p=>[p.id,p.name]);
-  const itemOpts=sel=>opts(db.items.map(i=>[i.id,i.name]),sel,'Custom line');
+  const itemOpts=sel=>opts(db.items.map(i=>[i.id,i.name+(i.model?' · '+i.model:'')]),sel,'Custom line');
   const lineRow=(l,i)=>{const it=db.items.find(x=>x.id===l.itemId);const st=it&&isS?itemStats(it).qty:null;
     return `<div class="ln"><div class="it"><select data-f="itemId" data-l="${i}" data-redraw aria-label="Item">${itemOpts(l.itemId)}</select></div>
     <div class="ds"><input data-f="desc" data-l="${i}" value="${esc(l.desc)}" placeholder="Description" aria-label="Description"></div>
@@ -520,7 +666,7 @@ function docForm(type,id,pre){
     <div class="f" style="margin-top:14px">${fld('Tax %',inp('tax',s.tax,'number','step="any" inputmode="decimal"'))}${fld('Note',inp('note',s.note))}</div>
     <div class="sum" id="sum">${totals(s)}</div>`,
     onAct:(m,d,s)=>{if(m==='add')s.lines.push({itemId:'',desc:'',qty:1,price:'',disc:''});if(m==='rm'){s.lines.splice(+d.i,1);if(!s.lines.length)s.lines.push({itemId:'',desc:'',qty:1,price:'',disc:''})}},
-    onChange:(s,f,i)=>{if(f==='itemId'){const l=s.lines[i],it=db.items.find(x=>x.id===l.itemId);if(it){l.desc=it.name;l.price=isS?it.price:it.cost}}},
+    onChange:(s,f,i)=>{if(f==='itemId'){const l=s.lines[i],it=db.items.find(x=>x.id===l.itemId);if(it){l.desc=it.name+(it.model?' - '+it.model:'');l.price=isS?it.price:it.cost}}},
     live:(s,bd)=>{s.lines.forEach((l,i)=>{const e=bd.querySelector('#la'+i);if(e)e.textContent=money(lineNet(l))});const sm=bd.querySelector('#sum');if(sm)sm.innerHTML=totals(s)},
     del:ex?()=>{db[type]=db[type].filter(d=>d.id!==id);db.payments.forEach(p=>{if(p.docId===id)p.docId=''});toast('Deleted. Linked payments were kept.')}:null,
     onSave:async s=>{
@@ -592,7 +738,7 @@ const ACT={
   openDoc:d=>openDoc(d.a,d.id),
   newPay:d=>payForm(null,{kind:d.k}),editPay:d=>{closeModal();payForm(d.id)},
   newParty:d=>partyForm(null,d.t),openParty:d=>openParty(d.id),
-  newItem:()=>itemForm(),editItem:d=>itemForm(d.id),newAdj:()=>adjForm(),editAdj:d=>{closeModal();adjForm(d.id)},
+  newItem:()=>itemForm(),editItem:d=>itemForm(d.id),newAdj:()=>adjForm(),importItems:()=>importForm(),newAsset:()=>assetForm(),editAsset:d=>assetForm(d.id),newInv:()=>invForm(),editInv:d=>invForm(d.id),editAdj:d=>{closeModal();adjForm(d.id)},
   signOut:()=>{FB.signOut(cloud.h)},
   changeProject:()=>{try{localStorage.removeItem(FBCFG)}catch(e){}try{FB.signOut(cloud.h)}catch(e){}location.reload()},
   editAcct:d=>acctForm(d.id||null),
@@ -603,7 +749,7 @@ const ACT={
   restore:()=>{const v=$('#restore').value.trim();if(!v)return toast('Paste a backup first');let o;
     try{o=JSON.parse(v);if(!o||o.v!==1||!Array.isArray(o.sales))throw 0}catch(e){return toast('That is not a valid backup')}
     if(CLOUD){const b=document.querySelector('[data-act=restore]');if(!b.dataset.sure){b.dataset.sure='1';b.textContent='Tap again: this replaces data on ALL devices';setTimeout(()=>{b.dataset.sure='';b.textContent='Restore from backup'},4000);return}}
-    o.adjustments=o.adjustments||[];if(CLOUD){o.seq=db.seq}db=o;render();toast('Backup restored')},
+    o.adjustments=o.adjustments||[];o.assets=o.assets||[];o.investments=o.investments||[];if(CLOUD){o.seq=db.seq}db=o;render();toast('Backup restored')},
   wipe:function(){const b=document.querySelector('[data-act=wipe]');if(!b.dataset.sure){b.dataset.sure='1';b.textContent='Tap again to erase everything';setTimeout(()=>{b.dataset.sure='';b.textContent='Erase all data'},3500);return}db=blank();render();toast('All data erased')}
 };
 document.addEventListener('click',e=>{const t=e.target.closest('[data-act]');if(!t||t.closest('#modal'))return;ACT[t.dataset.act]&&ACT[t.dataset.act](t.dataset)});
@@ -612,7 +758,7 @@ document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.tar
 document.addEventListener('input',e=>{if(e.target.id==='q'){S.q=e.target.value;const l=$('#list');if(l&&LISTS[S.view])l.innerHTML=LISTS[S.view]()}});
 
 /* ---------- cloud sync (Firebase) ---------- */
-const COLS=['parties','items','sales','purchases','payments','adjustments'];
+const COLS=['parties','items','sales','purchases','payments','adjustments','assets','investments'];
 const CCOLS=COLS.concat(['meta']);
 const FBCFG='deskbook.fbcfg';
 const cloud={h:null,user:null,loaded:false,pend:{},err:'',unsubs:[],got:0};
