@@ -101,6 +101,12 @@ label{display:block;font-size:13px;color:var(--mute);margin-bottom:4px;font-weig
 .ln.h{font-size:12px;color:var(--mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
 .ln .amt{text-align:right;font-family:var(--mono)}
 .ln button{all:unset;cursor:pointer;min-height:40px;display:flex;align-items:center;justify-content:center;color:var(--bad);font-size:20px;border-radius:8px}
+.ln .it{position:relative}
+.sug{position:absolute;left:0;right:0;top:100%;z-index:30;max-height:260px;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.25);margin-top:2px}
+.sug button{all:unset;box-sizing:border-box;display:block;width:100%;padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--line);font-size:14px}
+.sug button:hover,.sug button:focus{background:var(--accent-soft)}
+.sug button small{display:block;color:var(--mute);font-size:12px;margin-top:2px}
+.sug .cu{color:var(--mute)}
 .hint{font-size:12px;color:var(--mute);grid-column:1/-1;margin:-4px 0 4px}
 .sum{margin-left:auto;width:min(320px,100%);margin-top:10px}
 .sum div{display:flex;justify-content:space-between;padding:4px 0}
@@ -125,6 +131,17 @@ label{display:block;font-size:13px;color:var(--mute);margin-bottom:4px;font-weig
   .ln .it,.ln .ds{grid-column:1/-1}
   .ln .amt{grid-column:span 2}
 }
+#pinov{position:fixed;inset:0;z-index:300;background:#0f1a24;color:#fff;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto}
+#pinov[hidden]{display:none}
+#pinov .pbox{width:min(340px,100%);text-align:center}
+#pinov .pt{font-size:22px;font-weight:600;margin-bottom:6px}
+#pinov .ps{color:#b8c4cf;font-size:15px;min-height:22px;margin-bottom:14px}
+#pinov .pd{height:30px;font-size:26px;letter-spacing:8px;margin-bottom:14px}
+#pinov .pk{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}
+#pinov .pk button{all:unset;box-sizing:border-box;cursor:pointer;min-height:58px;border-radius:14px;background:rgba(255,255,255,.1);font-size:22px;display:flex;align-items:center;justify-content:center}
+#pinov .pk button:active{background:rgba(255,255,255,.25)}
+#pinov .pk .ok{background:var(--accent);color:var(--accent-ink);font-size:18px;font-weight:600}
+#pinov .plink{all:unset;cursor:pointer;color:#9fb3c4;font-size:14px;text-decoration:underline;padding:8px}
 #gate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:16px;z-index:80;overflow:auto}
 #gate[hidden]{display:none}
 .gate-card{width:min(480px,100%)}
@@ -253,7 +270,8 @@ function itemStats(it){let pq=0,pv=0,sq=0;
   db.sales.forEach(d=>d.lines.forEach(l=>{if(l.itemId===it.id)sq+=num(l.qty)}));
   let aq=0;(db.adjustments||[]).forEach(a=>{if(a.itemId===it.id)aq+=num(a.qty)});
   const oq=num(it.opening),base=oq+pq,avg=base>0?(oq*num(it.cost)+pv)/base:num(it.cost),q=base-sq+aq;
-  return {qty:q,avg:avg,value:Math.max(q,0)*avg,sold:sq}}
+  const unit=avg>0?avg:num(it.price);
+  return {qty:q,avg:avg,value:Math.max(q,0)*unit,costVal:Math.max(q,0)*avg,sellVal:Math.max(q,0)*num(it.price),sold:sq}}
 function partyBal(p){const list=p.type==='c'?db.sales:db.purchases;return list.filter(d=>d.partyId===p.id).reduce((a,d)=>a+balOf(d),0)}
 function acctBal(a){let b=num(a.open);db.payments.forEach(p=>{if(p.accountId!==a.id)return;b+=p.kind==='in'?p.amount:-p.amount});
   (db.assets||[]).forEach(x=>{if(x.accountId===a.id)b-=num(x.cost);if(x.status==='Sold'&&x.soldAccount===a.id)b+=num(x.soldAmount)});
@@ -371,6 +389,7 @@ const sampleBanner=()=>db.sample?`<div class="banner"><span><b>Sample data.</b> 
 const tools=(ph,chips)=>`<div class="tools"><input type="search" id="q" placeholder="${ph}" value="${esc(S.q)}" aria-label="Search">${(chips||[]).map(([k,l])=>`<button class="chip" data-act="filt" data-v="${k}" aria-pressed="${S.filt===k}">${l}</button>`).join('')}</div><div id="list"></div>`;
 const sumBy=(l,f)=>l.reduce((a,x)=>a+num(f(x)),0);
 const fc=(v,span)=>`<td class="r num"${span?` colspan="${span}"`:''}>${v}</td>`;
+const cap=t=>`<div style="font-weight:400;font-size:11px;opacity:.75">${t}</div>`;
 const fl=(t,span)=>`<td colspan="${span}">${t}</td>`;
 const table=(head,rows,empty,cls,foot)=>rows.length?`<div class="tw ${cls||''}"><table><thead><tr>${head.map(h=>`<th class="${h[1]||''}">${h[0]}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody>${foot?`<tfoot><tr>${foot}</tr></tfoot>`:''}</table></div>`:`<div class="card empty">${empty}</div>`;
 const match=(q,...f)=>!q||f.join(' ').toLowerCase().includes(q.toLowerCase());
@@ -427,11 +446,13 @@ VIEWS.money=function(){
   const bals=db.accounts.map(a=>`<div class="card kpi"><small>${esc(a.name)}</small><div class="v num">${money(acctBal(a))}</div></div>`).join('');
   return sampleBanner()+`<div class="grid kpis">${bals}</div>`+tools('Search payments',[['all','All'],['in','Received'],['out','Paid out'],['exp','Expenses']])};
 LISTS.money=()=>{
-  const list=db.payments.filter(p=>(S.filt==='all'||p.kind===S.filt)&&match(S.q,pname(p.partyId),p.category,p.note)).sort((a,b)=>a.date<b.date?1:-1);
+  const rows=db.payments.map(p=>{const doc=p.docId&&[...db.sales,...db.purchases].find(d=>d.id===p.docId);
+    return {date:p.date,kind:p.kind,who:p.kind==='exp'?p.category||'Expense':pname(p.partyId),note:p.note||'',acc:(acct(p.accountId)||{}).name||'',inv:doc?doc.no:'',amt:num(p.amount),act:'editPay',id:p.id}});
+  (db.assets||[]).forEach(a=>{if(a.status==='Sold'&&num(a.soldAmount)>0)rows.push({date:a.soldDate||a.date,kind:'in',who:'Asset sale: '+a.name,note:a.serial||'',acc:(acct(a.soldAccount)||{}).name||'',inv:'',amt:num(a.soldAmount),act:'editAsset',id:a.id,asset:true})});
+  const list=rows.filter(r=>(S.filt==='all'||r.kind===S.filt)&&match(S.q,r.who,r.note)).sort((a,b)=>a.date<b.date?1:-1);
   return table([['Date'],['Type'],['Party or category'],['Account'],['Invoice'],['Amount','r']],
-    list.map(p=>{const doc=p.docId&&[...db.sales,...db.purchases].find(d=>d.id===p.docId);
-      return `<tr data-act="editPay" data-id="${p.id}" tabindex="0"><td>${fdate(p.date)}</td><td><span class="pill ${p.kind}">${KIND[p.kind]}</span></td><td>${esc(p.kind==='exp'?p.category||'Expense':pname(p.partyId))}${p.note?`<div class="mute" style="font-size:12px">${esc(p.note)}</div>`:''}</td><td>${esc((acct(p.accountId)||{}).name||'')}</td><td class="num">${doc?esc(doc.no):''}</td><td class="r num ${p.kind==='in'?'pos':'neg'}">${p.kind==='in'?'':'-'}${money(p.amount)}</td></tr>`}),
-    'No payments recorded yet.','',(()=>{const rc=sumBy(list.filter(p=>p.kind==='in'),p=>p.amount),pd=sumBy(list.filter(p=>p.kind!=='in'),p=>p.amount);
+    list.map(r=>`<tr data-act="${r.act}" data-id="${r.id}" tabindex="0"><td>${fdate(r.date)}</td><td><span class="pill ${r.kind}">${r.asset?'Asset sale':KIND[r.kind]}</span></td><td>${esc(r.who)}${r.note?`<div class="mute" style="font-size:12px">${esc(r.note)}</div>`:''}</td><td>${esc(r.acc)}</td><td class="num">${esc(r.inv)}</td><td class="r num ${r.kind==='in'?'pos':'neg'}">${r.kind==='in'?'':'-'}${money(r.amt)}</td></tr>`),
+    'No payments recorded yet.','',(()=>{const rc=sumBy(list.filter(r=>r.kind==='in'),r=>r.amt),pd=sumBy(list.filter(r=>r.kind!=='in'),r=>r.amt);
       return fl(`Total · ${list.length} shown · Received ${money(rc)} · Paid out ${money(pd)} · Net`,5)+fc(money(rc-pd))})())};
 
 function partyList(t){
@@ -450,7 +471,7 @@ const itemsBase=()=>{
   const list=db.items.filter(i=>match(S.q,i.name,i.sku,i.model,i.location,i.comments)&&(!S.loc||i.location===S.loc)&&(!S.mod||i.model===S.mod)).sort((a,b)=>a.name.localeCompare(b.name));
   return table([['Item'],['Model'],['SKU'],['Location'],['In stock','r'],['Avg cost','r'],['Sell price','r'],['Stock value','r'],['Comments']],
     list.map(i=>{const s=itemStats(i),low=s.qty<=num(i.reorder);return `<tr data-act="editItem" data-id="${i.id}" tabindex="0"><td>${esc(i.name)}${low?' <span class="pill overdue">Low</span>':''}</td><td>${esc(i.model||'')}</td><td class="num">${esc(i.sku)}</td><td>${esc(i.location||'')}</td><td class="r num ${s.qty<0?'neg':''}">${qty(s.qty)} ${esc(i.unit)}</td><td class="r num">${money(s.avg)}</td><td class="r num">${money(i.price)}</td><td class="r num">${money(s.value)}</td><td style="min-width:140px;max-width:260px;white-space:normal">${esc(i.comments||'')}</td></tr>`}),
-    'No items yet. Add the products you buy and sell.','bigth',fl(`Total · ${list.length} items shown`,4)+fc(qty(sumBy(list,i=>itemStats(i).qty)))+'<td></td><td></td>'+fc(money(sumBy(list,i=>itemStats(i).value)))+'<td></td>')};
+    'No items yet. Add the products you buy and sell.','bigth',fl(`Total · ${list.length} items shown`,4)+fc(qty(sumBy(list,i=>Math.max(itemStats(i).qty,0))))+fc(money(sumBy(list,i=>itemStats(i).costVal))+cap('total at cost'))+fc(money(sumBy(list,i=>itemStats(i).sellVal))+cap('total at sell price'))+fc(money(sumBy(list,i=>itemStats(i).value))+cap('stock value'))+'<td></td>')};
 const adjTable=()=>{const a=(db.adjustments||[]).slice().sort((x,y)=>x.date<y.date?1:-1).slice(0,20);if(!a.length)return '';
   const it=id=>(db.items.find(i=>i.id===id)||{name:'(deleted)'}).name;
   return `<h2 style="margin:20px 0 8px">Recent stock adjustments</h2>`+table([['Date'],['Item'],['Change','r'],['Reason']],a.map(x=>`<tr data-act="editAdj" data-id="${x.id}" tabindex="0"><td>${fdate(x.date)}</td><td>${esc(it(x.itemId))}</td><td class="r num ${x.qty<0?'neg':'pos'}">${x.qty>0?'+':''}${qty(x.qty)}</td><td>${esc(x.reason)}</td></tr>`),'','bigth')};
@@ -573,6 +594,18 @@ function reportCSV(){const R=buildReport();const out=[R.head.map(h=>csvCell(h[0]
   R.rows.forEach(r=>{const cells=Array.isArray(r)?r:(r.b||r.h);out.push(cells.map(c=>csvCell(c&&c.m!=null?c.m.toFixed(2):c&&c.q!=null?c.q:String(c).trim())).join(','))});return out.join('\n')}
 
 /* ---------- settings ---------- */
+function lockCard(){
+  const L=window.AndroidLock;let nat=false;try{nat=!!(L&&L.isEnabled())}catch(e){}
+  const set=pinIsSet();
+  const inpn=(id,ph)=>`<input id="${id}" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" placeholder="${ph}">`;
+  return `<div class="card"><h2>Passcode lock</h2>
+    <p class="mute" style="margin-top:0">${set?'<b>On.</b> ':'<b>Off.</b> '}When on, the app asks for a 4 to 8 digit passcode every time you open it or come back to it. The passcode is saved on this device only, so set it on your phone and tablet separately.</p>
+    ${set?`<div class="f">${fld('Current passcode',inpn('pin_cur','Current'))}${fld('New passcode (to change it)',inpn('pin_new','4 to 8 digits'))}</div>
+      <button class="btn pri" data-act="pinChange">Change passcode</button> <button class="btn" data-act="pinOff">Turn off passcode</button>`
+    :`<div class="f">${fld('New passcode',inpn('pin_new','4 to 8 digits'))}${fld('Repeat passcode',inpn('pin_rep','Repeat'))}</div>
+      <button class="btn pri" data-act="pinOn">Turn on passcode</button>`}
+    ${nat?`<p class="mute" style="margin-top:14px">The phone fingerprint lock is also on. <button class="btn sm" data-act="lockToggle">Turn it off</button></p>`:''}</div>`}
+window.__lockChanged=()=>{if(S.view==='settings')render()};
 VIEWS.settings=function(){const st=db.settings;
   return sampleBanner()+`<div class="grid two">
   <div class="card"><h2>Profile photo</h2>
@@ -580,6 +613,7 @@ VIEWS.settings=function(){const st=db.settings;
     <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap"><div style="width:72px;height:72px;border-radius:50%;overflow:hidden;border:2px solid var(--accent);background:var(--accent-soft);display:flex;align-items:center;justify-content:center;color:var(--accent-text)">${st.photo?`<img alt="" src="${st.photo}" style="width:100%;height:100%;object-fit:cover">`:'<svg width="36" height="36" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4.2"/><path d="M3.5 21c.7-4.6 4.2-7 8.5-7s7.800 2.400 8.500 7z"/></svg>'}</div>
     <label class="btn pri" for="photo_file" style="cursor:pointer">Choose photo</label><input id="photo_file" type="file" accept="image/*" hidden>
     ${st.photo?'<button class="btn" data-act="rmPhoto">Remove</button>':''}</div></div>
+  ${lockCard()}
   <div class="card"><h2>Theme colour</h2>
     <p class="mute" style="margin-top:0">Pick the main colour for buttons and highlights. It is saved on this device only, so your phone and tablet can use different colours.</p>
     <div class="swatches">${ACC.map(([k,l,c])=>`<button class="sw" data-act="accent" data-v="${k}" aria-label="${l}" aria-pressed="${(document.documentElement.getAttribute('data-accent')||'green')===k}" style="--c:${c}"><span></span>${l}</button>`).join('')}</div></div>
@@ -625,6 +659,7 @@ function itemForm(id){
     <div class="f">${pick('model','Model')}${pick('location','Inventory location')}</div>
     <div class="f">${fld('Comments',inp('comments',s.comments,'text','placeholder="Any notes about this item"'))}</div>
     <div class="f">${fld('Purchase cost',inp('cost',s.cost,'number','step="any" inputmode="decimal"'))}${fld('Selling price',inp('price',s.price,'number','step="any" inputmode="decimal"'))}</div>
+    <p class="mute" style="font-size:13px;margin:-4px 0 10px">Stock value = quantity x purchase cost. If you leave the purchase cost empty, the selling price is used instead.</p>
     <div class="f">${fld('Opening stock',inp('opening',s.opening,'number','step="any" inputmode="decimal"'))}${fld('Reorder level',inp('reorder',s.reorder,'number','step="any" inputmode="decimal"'))}</div>
     ${ex?`<p class="mute">In stock now: <b class="num">${qty(itemStats(ex).qty)} ${esc(ex.unit)}</b></p>`:''}`,
     del:ex?()=>{const used=[...db.sales,...db.purchases].some(d=>d.lines.some(l=>l.itemId===id));if(used){toast('Used on invoices. Cannot delete.');return}db.items=db.items.filter(i=>i.id!==id);toast('Deleted')}:null,
@@ -707,7 +742,7 @@ function docForm(type,id,pre){
   const plist=db.parties.filter(p=>p.type===(isS?'c':'s')).sort((a,b)=>a.name.localeCompare(b.name)).map(p=>[p.id,p.name]);
   const itemOpts=sel=>opts(db.items.map(i=>[i.id,i.name+(i.model?' · '+i.model:'')]),sel,'Custom line');
   const lineRow=(l,i)=>{const it=db.items.find(x=>x.id===l.itemId);const st=it&&isS?itemStats(it).qty:null;
-    return `<div class="ln"><div class="it"><select data-f="itemId" data-l="${i}" data-redraw aria-label="Item">${itemOpts(l.itemId)}</select></div>
+    return `<div class="ln"><div class="it"><input type="search" class="isr" data-l="${i}" autocomplete="off" value="${esc(it?it.name+(it.model?' · '+it.model:''):'')}" placeholder="Search item or type a custom line" aria-label="Search item"><input type="hidden" data-f="itemId" data-l="${i}" data-redraw value="${esc(l.itemId)}"><div class="sug" hidden></div></div>
     <div class="ds"><input data-f="desc" data-l="${i}" value="${esc(l.desc)}" placeholder="Description" aria-label="Description"></div>
     <input data-f="qty" data-l="${i}" type="number" step="any" inputmode="decimal" value="${esc(l.qty)}" aria-label="Quantity">
     <input data-f="price" data-l="${i}" type="number" step="any" inputmode="decimal" value="${esc(l.price)}" aria-label="Price">
@@ -725,6 +760,14 @@ function docForm(type,id,pre){
     <div class="sum" id="sum">${totals(s)}</div>`,
     onAct:(m,d,s)=>{if(m==='add')s.lines.push({itemId:'',desc:'',qty:1,price:'',disc:''});if(m==='rm'){s.lines.splice(+d.i,1);if(!s.lines.length)s.lines.push({itemId:'',desc:'',qty:1,price:'',disc:''})}},
     onChange:(s,f,i)=>{if(f==='itemId'){const l=s.lines[i],it=db.items.find(x=>x.id===l.itemId);if(it){l.desc=it.name+(it.model?' - '+it.model:'');l.price=isS?it.price:it.cost}}},
+    after:(s,bd)=>{bd.querySelectorAll('.isr').forEach(inp=>{const box=inp.parentNode.querySelector('.sug'),hid=inp.parentNode.querySelector('[data-f=itemId]');
+      const show=q=>{q=(q||'').trim();const cur=db.items.find(x=>x.id===hid.value);const qq=cur&&q===(cur.name+(cur.model?' · '+cur.model:''))?'':q;
+        const m=db.items.filter(x=>match(qq,x.name,x.sku,x.model,x.location)).sort((a,b)=>a.name.localeCompare(b.name)).slice(0,40);
+        box.innerHTML=m.map(x=>{const st=itemStats(x);return `<button type="button" data-id="${x.id}"><b>${esc(x.name)}</b>${x.model?' · '+esc(x.model):''}<small>${x.sku?esc(x.sku)+' · ':''}${isS?'In stock '+qty(st.qty)+' '+esc(x.unit)+' · ':''}${money(isS?x.price:x.cost)}</small></button>`}).join('')+`<button type="button" data-id="" class="cu">Custom line (no inventory item)</button>`;box.hidden=false};
+      inp.addEventListener('focus',()=>{inp.select();show('')});
+      inp.addEventListener('input',()=>show(inp.value));
+      inp.addEventListener('blur',()=>setTimeout(()=>{box.hidden=true},180));
+      box.addEventListener('pointerdown',e=>{const b=e.target.closest('button');if(!b)return;e.preventDefault();hid.value=b.dataset.id;box.hidden=true;hid.dispatchEvent(new Event('change',{bubbles:true}))})})},
     live:(s,bd)=>{s.lines.forEach((l,i)=>{const e=bd.querySelector('#la'+i);if(e)e.textContent=money(lineNet(l))});const sm=bd.querySelector('#sum');if(sm)sm.innerHTML=totals(s)},
     del:ex?()=>{db[type]=db[type].filter(d=>d.id!==id);db.payments.forEach(p=>{if(p.docId===id)p.docId=''});toast('Deleted. Linked payments were kept.')}:null,
     onSave:async s=>{
@@ -803,6 +846,10 @@ const ACT={
   clearSample:()=>{const keep=db.settings;db=blank();db.settings.cur=keep.cur;render();toast('Sample data cleared')},
   loadSample:()=>{db=sample();render();toast('Sample data loaded')},
   accent:d=>{applyAccent(d.v);try{localStorage.setItem('deskbook.accent',d.v)}catch(e){}render()},
+  pinOn:async()=>{const n=$('#pin_new').value.trim(),r=$('#pin_rep').value.trim();if(!/^\d{4,8}$/.test(n))return toast('Use 4 to 8 digits only');if(n!==r)return toast('The two passcodes do not match');await pinSave(n);render();toast('Passcode turned on')},
+  pinOff:async()=>{if(!await pinCheck($('#pin_cur').value.trim()))return toast('Current passcode is wrong');pinClear();render();toast('Passcode turned off')},
+  pinChange:async()=>{if(!await pinCheck($('#pin_cur').value.trim()))return toast('Current passcode is wrong');const n=$('#pin_new').value.trim();if(!/^\d{4,8}$/.test(n))return toast('New passcode must be 4 to 8 digits');await pinSave(n);render();toast('Passcode changed')},
+  lockToggle:()=>{const L=window.AndroidLock;if(!L)return;let on=false;try{on=L.isEnabled()}catch(e){}if(on)L.disable();else L.enable()},
   rmPhoto:()=>{db.settings.photo='';render();toast('Photo removed')},
   saveLists:()=>{const get=id=>[...new Set($(id).value.split('\n').map(x=>x.trim()).filter(Boolean))];db.settings.models=get('#s_models');db.settings.locations=get('#s_locs');render();toast('Lists saved')},
   saveSettings:()=>{const st=db.settings;st.company=$('#s_co').value.trim()||'My Company';st.cur=$('#s_cur').value;st.tax=num($('#s_tax').value);st.pS=$('#s_pS').value;st.pP=$('#s_pP').value;render();toast('Settings saved')},
@@ -906,6 +953,43 @@ document.addEventListener('click',e=>{const t=e.target.closest('[data-g]');if(!t
   if(g==='proj'||g==='out'){if(g==='proj'){try{localStorage.removeItem(FBCFG)}catch(x){}location.reload()}else FB.signOut(cloud.h)}});
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='g_pw'){const b=document.querySelector('[data-g=login]');b&&b.click()}});
 
+/* ---------- passcode lock (4 to 8 digits, kept on this device) ---------- */
+const PINKEY='bm.pin';let pinBuf='',pinTries=0,pinLockUntil=0,skipLock=false;
+function pinRec(){try{return JSON.parse(localStorage.getItem(PINKEY)||'null')}catch(e){return null}}
+function pinIsSet(){return !!pinRec()}
+async function pinHash(p,salt){const t=salt+':'+p;
+  try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+  catch(e){let x=5381;for(let i=0;i<t.length;i++)x=((x<<5)+x+t.charCodeAt(i))|0;return 'w'+x}}
+async function pinSave(p){const s=Math.random().toString(36).slice(2)+Date.now().toString(36);
+  try{localStorage.setItem(PINKEY,JSON.stringify({s:s,h:await pinHash(p,s)}))}catch(e){toast('Could not save the passcode on this device')}}
+async function pinCheck(p){const r=pinRec();return !!r&&/^\d{4,8}$/.test(p)&&await pinHash(p,r.s)===r.h}
+function pinClear(){try{localStorage.removeItem(PINKEY)}catch(e){}hidePin()}
+function pinPaint(msg){const d=$('#pindots');if(d)d.textContent='●'.repeat(pinBuf.length);const m=$('#pinmsg');if(m&&msg!=null)m.textContent=msg}
+function showPin(msg){if(!pinIsSet())return;let o=$('#pinov');
+  if(!o){o=document.createElement('div');o.id='pinov';o.setAttribute('role','dialog');o.setAttribute('aria-modal','true');
+    o.innerHTML='<div class="pbox"><div class="pt">Business Manager</div><div class="ps" id="pinmsg">Enter your passcode</div><div class="pd" id="pindots"></div><div class="pk">'+
+      [1,2,3,4,5,6,7,8,9].map(n=>'<button data-pk="'+n+'">'+n+'</button>').join('')+'<button data-pk="back" aria-label="Delete">&#9003;</button><button data-pk="0">0</button><button class="ok" data-pk="ok">OK</button></div><button class="plink" data-pk="forgot">Forgot passcode?</button></div>';
+    document.body.appendChild(o);
+    o.addEventListener('click',e=>{const b=e.target.closest('[data-pk]');if(b)pinKey(b.dataset.pk)})}
+  o.hidden=false;pinBuf='';pinPaint(msg||'Enter your passcode')}
+function hidePin(){const o=$('#pinov');if(o)o.hidden=true;pinBuf='';pinTries=0}
+async function pinKey(k){
+  if(Date.now()<pinLockUntil)return;
+  if(k==='back'){pinBuf=pinBuf.slice(0,-1);return pinPaint()}
+  if(k==='forgot'){if(!confirm('This removes the passcode and signs you out. Then sign in again with your email and password.'))return;
+    pinClear();if(CLOUD){try{FB.signOut(cloud.h)}catch(e){}}return}
+  if(k==='ok'){if(pinBuf.length<4)return pinPaint('Enter 4 to 8 digits');
+    if(await pinCheck(pinBuf)){pinTries=0;return hidePin()}
+    pinBuf='';pinTries++;
+    if(pinTries>=5){pinTries=0;pinLockUntil=Date.now()+30000;pinPaint('Too many wrong tries. Wait 30 seconds.');setTimeout(()=>pinPaint('Enter your passcode'),30000);return}
+    return pinPaint('Wrong passcode. Try again.')}
+  if(/^\d$/.test(k)&&pinBuf.length<8){pinBuf+=k;pinPaint()}}
+document.addEventListener('keydown',e=>{const o=$('#pinov');if(!o||o.hidden)return;
+  if(/^\d$/.test(e.key))pinKey(e.key);else if(e.key==='Backspace')pinKey('back');else if(e.key==='Enter')pinKey('ok')});
+document.addEventListener('click',e=>{if(e.target.matches&&e.target.matches('input[type=file]')){skipLock=true;setTimeout(()=>{skipLock=false},6000)}},true);
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){if(!skipLock&&pinIsSet())showPin()}else skipLock=false});
+if(pinIsSet())showPin();
 render();
 if(CLOUD)startCloud();
 })();
