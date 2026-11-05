@@ -101,12 +101,12 @@ label{display:block;font-size:13px;color:var(--mute);margin-bottom:4px;font-weig
 .ln.h{font-size:12px;color:var(--mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
 .ln .amt{text-align:right;font-family:var(--mono)}
 .ln button{all:unset;cursor:pointer;min-height:40px;display:flex;align-items:center;justify-content:center;color:var(--bad);font-size:20px;border-radius:8px}
-.ln .it{position:relative}
-.sug{position:absolute;left:0;right:0;top:100%;z-index:30;max-height:260px;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.25);margin-top:2px}
+.ln .it,.pk{position:relative}
+.sug{position:absolute;left:0;right:0;top:100%;z-index:30;max-height:min(320px,45vh);overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.25);margin-top:2px}
 .sug button{all:unset;box-sizing:border-box;display:block;width:100%;padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--line);font-size:14px}
 .sug button:hover,.sug button:focus{background:var(--accent-soft)}
 .sug button small{display:block;color:var(--mute);font-size:12px;margin-top:2px}
-.sug .cu{color:var(--mute)}
+.sug .cu{color:var(--mute)}.sug .none{padding:12px;color:var(--mute);font-size:14px}
 .hint{font-size:12px;color:var(--mute);grid-column:1/-1;margin:-4px 0 4px}
 .sum{margin-left:auto;width:min(320px,100%);margin-top:10px}
 .sum div{display:flex;justify-content:space-between;padding:4px 0}
@@ -338,7 +338,7 @@ function openForm(cfg){
       Promise.resolve().then(()=>cfg.onSave(s)).then(r=>{x.disabled=false;if(r===true){closeModal();render()}else{const e=$('#ferr');if(e)e.textContent=r||''}},
         err=>{x.disabled=false;const e=$('#ferr');if(e)e.textContent='Could not save: '+((err&&err.message)||err)})}
     if(x.dataset.x==='del'){if(x.dataset.sure){cfg.del(s);closeModal();render()}else{x.dataset.sure='1';x.textContent='Tap again to delete';setTimeout(()=>{x.dataset.sure='';x.textContent='Delete'},3000)}}});
-  setTimeout(()=>{const f=bd.querySelector('input:not([type=hidden]),select');f&&f.focus&&f.focus({preventScroll:true})},30)}
+  setTimeout(()=>{const f=bd.querySelector('input:not([type=hidden]):not(.isr),select');f&&f.focus&&f.focus({preventScroll:true})},30)}
 
 /* read-only sheet with buttons */
 function openView(title,html,buttons,narrow){
@@ -727,13 +727,35 @@ function importForm(){
 function adjForm(id){
   const ex=id&&(db.adjustments||[]).find(a=>a.id===id);const s=ex?{...ex}:{itemId:'',date:today(),qty:'',reason:'Stock count'};
   openForm({title:ex?'Edit stock adjustment':'Adjust stock',s:s,narrow:true,
-    body:s=>`<div class="f">${fld('Item',`<select data-f="itemId">${opts(db.items.map(i=>[i.id,i.name]),s.itemId,'Choose…')}</select>`)}${fld('Date',inp('date',s.date,'date'))}</div>
+    body:s=>`<div class="f">${fld('Item',pickHtml('itemA','itemId',s.itemId,'Search item',''))}${fld('Date',inp('date',s.date,'date'))}</div>
     <div class="f">${fld('Quantity change (use - to reduce)',inp('qty',s.qty,'number','step="any" inputmode="decimal"'))}${fld('Reason',`<input data-f="reason" list="reasons" value="${esc(s.reason)}"><datalist id="reasons"><option value="Stock count"><option value="Damaged"><option value="Expired"><option value="Lost"><option value="Sample given"><option value="Returned"></datalist>`)}</div>
     <p class="mute" style="font-size:13px">Adding stock that you bought? Record a purchase bill instead, so the cost and supplier balance stay correct.</p>`,
     del:ex?()=>{db.adjustments=db.adjustments.filter(a=>a.id!==id);toast('Deleted')}:null,
+    after:(s,bd)=>wirePicks(bd),
     onSave:s=>{if(!s.itemId)return 'Choose an item.';const q=num(s.qty);if(!q)return 'Enter a quantity other than zero.';
       const o={itemId:s.itemId,date:s.date||today(),qty:q,reason:(s.reason||'').trim()};
       if(!db.adjustments)db.adjustments=[];if(ex)Object.assign(ex,o);else db.adjustments.push({id:uid(),...o});return true}})}
+
+/* searchable pick lists (type to filter, scroll the whole list, tap to choose) */
+const PICKSRC={
+  itemS:()=>db.items.map(x=>({id:x.id,label:x.name+(x.model?' · '+x.model:''),sub:(x.sku?x.sku+' · ':'')+'In stock '+qty(itemStats(x).qty)+' '+x.unit+' · '+money(x.price),hay:[x.name,x.sku,x.model,x.location]})),
+  itemP:()=>db.items.map(x=>({id:x.id,label:x.name+(x.model?' · '+x.model:''),sub:(x.sku?x.sku+' · ':'')+'Cost '+money(x.cost),hay:[x.name,x.sku,x.model,x.location]})),
+  itemA:()=>db.items.map(x=>({id:x.id,label:x.name+(x.model?' · '+x.model:''),sub:(x.sku?x.sku+' · ':'')+'In stock '+qty(itemStats(x).qty)+' '+x.unit,hay:[x.name,x.sku,x.model,x.location]})),
+  cust:()=>db.parties.filter(p=>p.type==='c').map(p=>({id:p.id,label:p.name,sub:[p.phone,p.email].filter(Boolean).join(' · '),hay:[p.name,p.phone,p.email]})),
+  supp:()=>db.parties.filter(p=>p.type==='s').map(p=>({id:p.id,label:p.name,sub:[p.phone,p.email].filter(Boolean).join(' · '),hay:[p.name,p.phone,p.email]}))};
+const pickHtml=(src,f,val,ph,blank,l)=>{const cur=PICKSRC[src]().find(x=>x.id===val);
+  return `<div class="pk"><input type="search" class="isr" data-src="${src}" data-blank="${esc(blank||'')}" autocomplete="off" value="${esc(cur?cur.label:'')}" placeholder="${esc(ph)}" aria-label="${esc(ph)}"><input type="hidden" data-f="${f}"${l!=null?` data-l="${l}"`:''} data-redraw value="${esc(val||'')}"><div class="sug" hidden></div></div>`};
+function wirePicks(bd){bd.querySelectorAll('.isr').forEach(inp=>{const wrap=inp.parentNode,box=wrap.querySelector('.sug'),hid=wrap.querySelector('input[type=hidden]');
+  const show=q=>{q=(q||'').trim();const all=PICKSRC[inp.dataset.src](),cur=all.find(x=>x.id===hid.value),qq=cur&&q===cur.label?'':q;
+    const m=all.filter(x=>match(qq,...x.hay)).sort((a,b)=>a.label.localeCompare(b.label)).slice(0,400);
+    box.innerHTML=m.map(x=>`<button type="button" data-id="${esc(x.id)}"><b>${esc(x.label)}</b>${x.sub?`<small>${esc(x.sub)}</small>`:''}</button>`).join('')+(m.length?'':'<div class="none">No match</div>')+(inp.dataset.blank?`<button type="button" data-id="" class="cu">${esc(inp.dataset.blank)}</button>`:'');
+    box.hidden=false;box.scrollTop=0;try{box.scrollIntoView({block:'nearest'})}catch(e){}};
+  const hide=()=>setTimeout(()=>{if(!box.contains(document.activeElement)&&document.activeElement!==inp)box.hidden=true},200);
+  inp.addEventListener('focus',()=>{inp.select();show('')});
+  inp.addEventListener('input',()=>show(inp.value));
+  inp.addEventListener('blur',hide);box.addEventListener('focusout',hide);
+  box.addEventListener('mousedown',e=>e.preventDefault());
+  box.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;hid.value=b.dataset.id;box.hidden=true;hid.dispatchEvent(new Event('change',{bubbles:true}))})})}
 
 function docForm(type,id,pre){
   const isS=type==='sales',ex=id&&db[type].find(d=>d.id===id);
@@ -742,7 +764,7 @@ function docForm(type,id,pre){
   const plist=db.parties.filter(p=>p.type===(isS?'c':'s')).sort((a,b)=>a.name.localeCompare(b.name)).map(p=>[p.id,p.name]);
   const itemOpts=sel=>opts(db.items.map(i=>[i.id,i.name+(i.model?' · '+i.model:'')]),sel,'Custom line');
   const lineRow=(l,i)=>{const it=db.items.find(x=>x.id===l.itemId);const st=it&&isS?itemStats(it).qty:null;
-    return `<div class="ln"><div class="it"><input type="search" class="isr" data-l="${i}" autocomplete="off" value="${esc(it?it.name+(it.model?' · '+it.model:''):'')}" placeholder="Search item or type a custom line" aria-label="Search item"><input type="hidden" data-f="itemId" data-l="${i}" data-redraw value="${esc(l.itemId)}"><div class="sug" hidden></div></div>
+    return `<div class="ln"><div class="it">${pickHtml(isS?'itemS':'itemP','itemId',l.itemId,'Search item or type a custom line','Custom line (no inventory item)',i)}</div></div>
     <div class="ds"><input data-f="desc" data-l="${i}" value="${esc(l.desc)}" placeholder="Description" aria-label="Description"></div>
     <input data-f="qty" data-l="${i}" type="number" step="any" inputmode="decimal" value="${esc(l.qty)}" aria-label="Quantity">
     <input data-f="price" data-l="${i}" type="number" step="any" inputmode="decimal" value="${esc(l.price)}" aria-label="Price">
@@ -752,7 +774,7 @@ function docForm(type,id,pre){
     ${st!=null?`<div class="hint">In stock: ${qty(st)} ${esc(it.unit)}${num(l.qty)>st?' · this sale exceeds stock':''}</div>`:''}</div>`};
   const totals=s=>`<div>${'<span>Subtotal</span>'}<span class="num" id="t1">${money(subOf(s))}</span></div><div><span>Tax</span><span class="num" id="t2">${money(taxOf(s))}</span></div><div class="g"><span>Total</span><span class="num" id="t3">${money(totOf(s))}</span></div>`;
   openForm({title:(ex?'Edit ':'New ')+(isS?'sales invoice':'purchase bill'),s:s,
-    body:s=>`<div class="f">${fld(isS?'Customer':'Supplier',`<select data-f="partyId">${opts(plist,s.partyId,'Choose…')}</select>`)}${fld('Date',inp('date',s.date,'date'))}${fld('Due date',inp('due',s.due,'date'))}${fld('Number',inp('no',s.no))}</div>
+    body:s=>`<div class="f">${fld(isS?'Customer':'Supplier',pickHtml(isS?'cust':'supp','partyId',s.partyId,'Search '+(isS?'customer':'supplier')+' name or phone',''))}${fld('Date',inp('date',s.date,'date'))}${fld('Due date',inp('due',s.due,'date'))}${fld('Number',inp('no',s.no))}</div>
     <div class="ln h"><span>Item</span><span>Description</span><span>Qty</span><span>${isS?'Price':'Cost'}</span><span>Disc %</span><span style="text-align:right">Amount</span><span></span></div>
     ${s.lines.map(lineRow).join('')}
     <button class="btn sm" data-m="add">+ Add line</button>
@@ -760,14 +782,7 @@ function docForm(type,id,pre){
     <div class="sum" id="sum">${totals(s)}</div>`,
     onAct:(m,d,s)=>{if(m==='add')s.lines.push({itemId:'',desc:'',qty:1,price:'',disc:''});if(m==='rm'){s.lines.splice(+d.i,1);if(!s.lines.length)s.lines.push({itemId:'',desc:'',qty:1,price:'',disc:''})}},
     onChange:(s,f,i)=>{if(f==='itemId'){const l=s.lines[i],it=db.items.find(x=>x.id===l.itemId);if(it){l.desc=it.name+(it.model?' - '+it.model:'');l.price=isS?it.price:it.cost}}},
-    after:(s,bd)=>{bd.querySelectorAll('.isr').forEach(inp=>{const box=inp.parentNode.querySelector('.sug'),hid=inp.parentNode.querySelector('[data-f=itemId]');
-      const show=q=>{q=(q||'').trim();const cur=db.items.find(x=>x.id===hid.value);const qq=cur&&q===(cur.name+(cur.model?' · '+cur.model:''))?'':q;
-        const m=db.items.filter(x=>match(qq,x.name,x.sku,x.model,x.location)).sort((a,b)=>a.name.localeCompare(b.name)).slice(0,40);
-        box.innerHTML=m.map(x=>{const st=itemStats(x);return `<button type="button" data-id="${x.id}"><b>${esc(x.name)}</b>${x.model?' · '+esc(x.model):''}<small>${x.sku?esc(x.sku)+' · ':''}${isS?'In stock '+qty(st.qty)+' '+esc(x.unit)+' · ':''}${money(isS?x.price:x.cost)}</small></button>`}).join('')+`<button type="button" data-id="" class="cu">Custom line (no inventory item)</button>`;box.hidden=false};
-      inp.addEventListener('focus',()=>{inp.select();show('')});
-      inp.addEventListener('input',()=>show(inp.value));
-      inp.addEventListener('blur',()=>setTimeout(()=>{box.hidden=true},180));
-      box.addEventListener('pointerdown',e=>{const b=e.target.closest('button');if(!b)return;e.preventDefault();hid.value=b.dataset.id;box.hidden=true;hid.dispatchEvent(new Event('change',{bubbles:true}))})})},
+    after:(s,bd)=>wirePicks(bd),
     live:(s,bd)=>{s.lines.forEach((l,i)=>{const e=bd.querySelector('#la'+i);if(e)e.textContent=money(lineNet(l))});const sm=bd.querySelector('#sum');if(sm)sm.innerHTML=totals(s)},
     del:ex?()=>{db[type]=db[type].filter(d=>d.id!==id);db.payments.forEach(p=>{if(p.docId===id)p.docId=''});toast('Deleted. Linked payments were kept.')}:null,
     onSave:async s=>{
@@ -792,8 +807,9 @@ function payForm(id,pre){
     body:s=>{const t=s.kind==='in'?'c':'s';const pl=db.parties.filter(p=>p.type===t).sort((a,b)=>a.name.localeCompare(b.name)).map(p=>[p.id,p.name]);
       return `<div class="f">${fld('Type',`<select data-f="kind" data-redraw><option value="in" ${s.kind==='in'?'selected':''}>Received from customer</option><option value="out" ${s.kind==='out'?'selected':''}>Paid to supplier</option><option value="exp" ${s.kind==='exp'?'selected':''}>Expense</option></select>`)}${fld('Date',inp('date',s.date,'date'))}</div>
       ${s.kind==='exp'?`<div class="f">${fld('Category',`<input data-f="category" list="cats" value="${esc(s.category)}" placeholder="Rent, Transport…"><datalist id="cats">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>`)}${fld('Note',inp('note',s.note))}</div>`
-      :`<div class="f">${fld(s.kind==='in'?'Customer':'Supplier',`<select data-f="partyId" data-redraw>${opts(pl,s.partyId,'Choose…')}</select>`)}${fld('Apply to invoice',`<select data-f="docId" data-redraw>${opts(openDocs(s).map(d=>[d.id,d.no+' · balance '+money(balOf(d)+(d.id===s.docId&&ex?ex.amount:0))]),s.docId,'On account (no invoice)')}</select>`)}</div><div class="f">${fld('Note',inp('note',s.note))}</div>`}
+      :`<div class="f">${fld(s.kind==='in'?'Customer':'Supplier',pickHtml(s.kind==='in'?'cust':'supp','partyId',s.partyId,'Search '+(s.kind==='in'?'customer':'supplier'),''))}${fld('Apply to invoice',`<select data-f="docId" data-redraw>${opts(openDocs(s).map(d=>[d.id,d.no+' · balance '+money(balOf(d)+(d.id===s.docId&&ex?ex.amount:0))]),s.docId,'On account (no invoice)')}</select>`)}</div><div class="f">${fld('Note',inp('note',s.note))}</div>`}
       <div class="f">${fld('Account',`<select data-f="accountId">${opts(db.accounts.map(a=>[a.id,a.name]),s.accountId)}</select>`)}${fld('Amount',inp('amount',s.amount,'number','step="any" inputmode="decimal"'))}</div>`},
+    after:(s,bd)=>wirePicks(bd),
     onChange:(s,f)=>{
       if(f==='kind'){s.partyId='';s.docId='';}
       if(f==='partyId')s.docId='';
