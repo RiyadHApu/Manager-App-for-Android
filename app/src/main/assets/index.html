@@ -767,7 +767,7 @@ function docForm(type,id,pre){
     return `<div class="ln"><div class="it">${pickHtml(isS?'itemS':'itemP','itemId',l.itemId,'Search item or type a custom line','Custom line (no inventory item)',i)}</div></div>
     <div class="ds"><input data-f="desc" data-l="${i}" value="${esc(l.desc)}" placeholder="Description" aria-label="Description"></div>
     <input data-f="qty" data-l="${i}" type="number" step="any" inputmode="decimal" value="${esc(l.qty)}" aria-label="Quantity">
-    <input data-f="price" data-l="${i}" type="number" step="any" inputmode="decimal" value="${esc(l.price)}" aria-label="Price">
+    <input data-f="price" data-l="${i}" type="number" step="any" inputmode="decimal" value="${num(l.price)>0?esc(l.price):''}" placeholder="${isS?'Price':'Cost'}" aria-label="${isS?'Price':'Cost'}">
     <input data-f="disc" data-l="${i}" type="number" step="any" inputmode="decimal" value="${esc(l.disc)}" placeholder="0" aria-label="Discount percent">
     <div class="amt" id="la${i}">${money(lineNet(l))}</div>
     <button data-m="rm" data-i="${i}" aria-label="Remove line">×</button>
@@ -781,7 +781,7 @@ function docForm(type,id,pre){
     <div class="f" style="margin-top:14px">${fld('Tax %',inp('tax',s.tax,'number','step="any" inputmode="decimal"'))}${fld('Note',inp('note',s.note))}</div>
     <div class="sum" id="sum">${totals(s)}</div>`,
     onAct:(m,d,s)=>{if(m==='add')s.lines.push({itemId:'',desc:'',qty:1,price:'',disc:''});if(m==='rm'){s.lines.splice(+d.i,1);if(!s.lines.length)s.lines.push({itemId:'',desc:'',qty:1,price:'',disc:''})}},
-    onChange:(s,f,i)=>{if(f==='itemId'){const l=s.lines[i],it=db.items.find(x=>x.id===l.itemId);if(it){l.desc=it.name+(it.model?' - '+it.model:'');l.price=isS?it.price:it.cost}}},
+    onChange:(s,f,i)=>{if(f==='itemId'){const l=s.lines[i],it=db.items.find(x=>x.id===l.itemId);if(it){l.desc=it.name+(it.model?' - '+it.model:'');{const pv=num(isS?it.price:it.cost);l.price=pv>0?pv:''}}}},
     after:(s,bd)=>wirePicks(bd),
     live:(s,bd)=>{s.lines.forEach((l,i)=>{const e=bd.querySelector('#la'+i);if(e)e.textContent=money(lineNet(l))});const sm=bd.querySelector('#sum');if(sm)sm.innerHTML=totals(s)},
     del:ex?()=>{db[type]=db[type].filter(d=>d.id!==id);db.payments.forEach(p=>{if(p.docId===id)p.docId=''});toast('Deleted. Linked payments were kept.')}:null,
