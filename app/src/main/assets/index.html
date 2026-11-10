@@ -640,7 +640,8 @@ VIEWS.settings=function(){const st=db.settings;
     <button class="btn" data-act="signOut">Sign out / switch business</button> <button class="btn" data-act="changeProject">Use a different cloud project</button></div>`
   :`<div class="card"><h2>Start over</h2>
     <p class="mute" style="margin-top:0">Removes every record and returns to an empty company. Copy a backup first.</p>
-    <button class="btn danger" data-act="wipe">Erase all data</button> <button class="btn" data-act="loadSample">Load sample data</button></div>`}`};
+    <button class="btn danger" data-act="wipe">Erase all data</button> <button class="btn" data-act="loadSample">Load sample data</button></div>`}
+  <p class="mute" style="font-size:12px;text-align:center;margin:18px 0 4px">Business Manager · version 10 (10 Nov 2026)</p>`};
 
 /* ---------- forms ---------- */
 function partyForm(id,type){
@@ -768,7 +769,7 @@ function docForm(type,id,pre){
     <div class="ds"><input data-f="desc" data-l="${i}" value="${esc(l.desc)}" placeholder="Description" aria-label="Description"></div>
     <input data-f="qty" data-l="${i}" type="number" step="any" inputmode="decimal" value="${esc(l.qty)}" aria-label="Quantity">
     <input data-f="price" data-l="${i}" type="number" step="any" inputmode="decimal" value="${num(l.price)>0?esc(l.price):''}" placeholder="${isS?'Price':'Cost'}" aria-label="${isS?'Price':'Cost'}">
-    <input data-f="disc" data-l="${i}" type="number" step="any" inputmode="decimal" value="${esc(l.disc)}" placeholder="0" aria-label="Discount percent">
+    <input data-f="disc" data-l="${i}" type="number" step="any" inputmode="decimal" value="${num(l.disc)>0?esc(l.disc):''}" placeholder="Discount" aria-label="Discount percent">
     <div class="amt" id="la${i}">${money(lineNet(l))}</div>
     <button data-m="rm" data-i="${i}" aria-label="Remove line">×</button>
     ${st!=null?`<div class="hint">In stock: ${qty(st)} ${esc(it.unit)}${num(l.qty)>st?' · this sale exceeds stock':''}</div>`:''}</div>`};
