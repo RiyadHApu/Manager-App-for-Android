@@ -768,7 +768,7 @@ function docForm(type,id,pre){
     <div class="ds"><input data-f="desc" data-l="${i}" value="${esc(l.desc)}" placeholder="Description" aria-label="Description"></div>
     <input data-f="qty" data-l="${i}" type="number" step="any" inputmode="decimal" value="${esc(l.qty)}" aria-label="Quantity">
     <input data-f="price" data-l="${i}" type="number" step="any" inputmode="decimal" value="${num(l.price)>0?esc(l.price):''}" placeholder="${isS?'Price':'Cost'}" aria-label="${isS?'Price':'Cost'}">
-    <input data-f="disc" data-l="${i}" type="number" step="any" inputmode="decimal" value="${esc(l.disc)}" placeholder="0" aria-label="Discount percent">
+    <input data-f="disc" data-l="${i}" type="number" step="any" inputmode="decimal" value="${num(l.disc)>0?esc(l.disc):''}" placeholder="Discount" aria-label="Discount percent">
     <div class="amt" id="la${i}">${money(lineNet(l))}</div>
     <button data-m="rm" data-i="${i}" aria-label="Remove line">×</button>
     ${st!=null?`<div class="hint">In stock: ${qty(st)} ${esc(it.unit)}${num(l.qty)>st?' · this sale exceeds stock':''}</div>`:''}</div>`};
